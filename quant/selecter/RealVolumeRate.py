@@ -41,8 +41,10 @@ class RealVolumeRateSelecter(Selecter):
             curr = tmpdf[tmpdf.s_code == _data.iloc[i].s_code]
             #过滤近一个月上线的新股
             #print _data.iloc[i]
-            #print int(curr.listing_date)
+            #print curr.listing_date
+            #continue
             #sys.exit()
+
             if int(curr.listing_date) > int(listing_date):
                 continue
 

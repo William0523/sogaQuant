@@ -8,6 +8,7 @@ from quant.spider.Index import *
 from quant.spider.TouTiao import *
 from quant.spider.TouTiaoDetail import *
 from quant.spider.Stock import *
+from quant.spider.Fund import *
 
 from quant.stats.ElSearch import *
 from quant.stats.Average import *

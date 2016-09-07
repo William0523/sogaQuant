@@ -8,6 +8,11 @@ from quant.spider.MinData import *
 from quant.stats.RealTimeChange import *
 from quant.stats.SecondDraw import *
 from quant.stats.Pankou import *
+from quant.stats.Department import *
+
+from quant.stats.F10 import *
+
+from quant.spider.Stock import *
 
 
 def __read_config():
@@ -37,6 +42,10 @@ def demo():
     SecondDrawStats(sys.argv).run()
 
 
+def follow_yyb():
+    Department().daily()
+
+
 def pankou_replay():
     #盘后 对挂单超过2KW的单子进行监控
     Pankou().replay()
@@ -60,6 +69,21 @@ def pankou_save():
     while 1:
         Pankou().save()
 
+
+def xue_qiu_ltgd():
+    StockSpider().get_ltgd()
+
+
+def gudong():
+    F10().history_gudong()
+
+
+def gudong_name():
+    F10().search_gudong_name()
+
+
+def get_new_gudong():
+    F10().get_new_gudong()
 
 if __name__ == '__main__':
     import argparse

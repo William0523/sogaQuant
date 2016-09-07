@@ -11,6 +11,8 @@ from quant.spider.Baidu import *
 
 from quant.spider.Demo import *
 
+from quant.spider.Tao import *
+
 
 def Usage():
     print 'site.py usage:'
@@ -28,6 +30,10 @@ def Usage():
 
 def run_demo():
     DemoSpider().run()
+
+
+def get_tao_video():
+    TaoSpider().run()
 
 
 def get_tt_video():

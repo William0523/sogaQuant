@@ -44,6 +44,10 @@ class Abstract(object):
         if signum == signal.SIGTERM or signum == signal.SIGINT:
             self.interrupted = True
 
+    def read_yyb_config(self):
+        self.config_path = os.path.dirname(__file__) + '/../../yyb.json'
+        return self.file2dict(self.config_path)
+
     def __read_config(self):
         """读取 config"""
         self.config_path = os.path.dirname(__file__) + '/../../config.json'

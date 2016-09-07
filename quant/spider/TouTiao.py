@@ -28,12 +28,15 @@ class TouTiaoSpider(SpiderEngine):
         #头条列表
         print sys.argv
         self.tools.setup_logging(sys.argv[1], True, True)
-        _data = self.sGet('http://toutiao.com/api/article/recent/?source=2&count=100&category=video&_=1462718705623')
+        _data = self.sGet('http://www.toutiao.com/api/article/recent/?source=2&count=20&category=video&max_behot_time=1470447756&utm_source=toutiao&offset=0&as=A185D70AF5B760A&cp=57A5D716505A2E1&max_create_time=1463846778&_=1470461440433')
+        #print _data
+        #sys.exit()
         re = json.loads(_data)
-        #quncms_db = self.config['mysql']['quncms']
-        #mysql = sMysql(quncms_db['host'], quncms_db['user'], quncms_db['password'], quncms_db['dbname'])
-
+        quncms_db2 = self.config['mysql']['quncms2']
+        self.qundb_online = sMysql(quncms_db2['host'], quncms_db2['user'], quncms_db2['password'], quncms_db2['dbname'])
         for i in range(0, len(re['data'])):
+            if 'media_url' not in re['data'][i].keys():
+                continue
             item = {}
             uid = re['data'][i]['media_url'].replace('http://toutiao.com/m', '')
             item['user_id'] = uid.replace('/', '')
@@ -50,21 +53,23 @@ class TouTiaoSpider(SpiderEngine):
             item['create_time'] = str(re['data'][i]['create_time'])
             item['video_id'] = ''
             item['video_url'] = ''
-            _has = self.qundb.fetch_one("select * from  video_contents where item_id='%s'" % item['item_id'])
+            #print item
+            #sys.exit()
+            _has = self.qundb_online.fetch_one("select * from  video_contents where item_id='%s' OR v_id =%s" % (item['item_id'], item['v_id']))
             print item
             if _has is None:
                 logging.debug('Done=====:%s=====%s ' % (item['title'], item['item_seo_url']))
-                self.qundb.dbInsert('video_contents', item)
+                self.qundb_online.dbInsert('video_contents', item)
 
             vauthor = {}
             vauthor['media_name'] = re['data'][i]['media_name']
             vauthor['media_url'] = re['data'][i]['media_url']
             vauthor['middle_image'] = re['data'][i]['middle_image']
 
-            _has = self.qundb.fetch_one("select * from video_author where media_url='%s'" % vauthor['media_url'])
+            _has = self.qundb_online.fetch_one("select * from video_author where media_url='%s'" % vauthor['media_url'])
             #print indata
             if _has is None:
-                self.qundb.dbInsert('video_author', vauthor)
+                self.qundb_online.dbInsert('video_author', vauthor)
 
     def run_post(self):
         #定时发布一次80
@@ -72,6 +77,7 @@ class TouTiaoSpider(SpiderEngine):
         data = self.qundb.fetch_one("select * from video_contents where is_done=0 and source_site=1 order by itemid asc limit 1")
         if data is None:
             print "done..."
+            return False
         i = data['itemid']
         j = 1
         while 1:

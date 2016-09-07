@@ -3,7 +3,6 @@ import sys
 import time
 import datetime
 import logging
-import pandas
 from quant.core.Spider import *
 
 
@@ -141,13 +140,13 @@ class LhbDataSpider(SpiderEngine):
             self.mysql.dbUpdate('s_lhb_days', {'status': 1}, "id=%s" % s_data['id'])
             return 1
         if _tr is not None:
-            _hands = _tr[0].replace(u'万手', '')
+            _hands = _tr[0].replace(u'万股', '')
             _hands = _hands.replace('&nbsp;', '')
             _hands = float(_hands)*10000
             ud = 0
             if _tr is not None:
                 if len(_td) > 0:
-                    ud = _td[0].replace(u'万手', '')
+                    ud = _td[0].replace(u'万股', '')
                     ud = ud.replace('&nbsp;', '')
             code = s_code.lower()
             indata = {
@@ -221,13 +220,16 @@ class LhbDataSpider(SpiderEngine):
         logging.debug('GetUrl:%s ' % url)
 
         _data = self.sGet(url)
-        _tr = self.sMatch('<td class="tip-trigger " code="(.*?)">', '<\/td>', _data, 0)
+        _tr = self.sMatch('<td class="tip-trigger" code="(.*?)">', '<\/td>', _data, 0)
         _vprint = self.sMatch('<td class=" c_eq">', '<\/td>', _data, 0)
+        #print _tr
+        #sys.exit()
         for i in range(0, len(_tr)):
 
             s_code = _tr[i][0]
             _prx = s_code[0:1]
             if int(_prx) not in [0, 3, 6]:
+                print "what"
                 continue
             if int(_prx) == 0 or int(_prx) == 3:
                 s_code = 'sz%s' % s_code
@@ -251,6 +253,7 @@ class LhbDataSpider(SpiderEngine):
                 'volume': float(_vprint[i]) * 10000,
                 's_reason': ''
             }
+            print indata
             _has = self.mysql.fetch_one("select * from  s_lhb_days where s_code='%s' and dateline=%s" % (indata['s_code'], dateline))
             if _has is None:
                 self.mysql.dbInsert('s_lhb_days', indata)
