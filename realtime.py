@@ -13,6 +13,7 @@ from quant.stats.Department import *
 from quant.stats.F10 import *
 
 from quant.spider.Stock import *
+from quant.spider.LhbData import *
 
 
 def __read_config():
@@ -66,16 +67,51 @@ def pankou_save():
     获取实时5档买卖盘口
     python realtime.py get_five_sb 页数
     '''
+    mcache = memcache.Client(['127.0.0.1:11211'])
     while 1:
-        Pankou().save()
+        Pankou().save(mcache)
 
 
-def xue_qiu_ltgd():
+def save_big_order():
+    Pankou().save_stock_big_order()
+
+
+def stats_big_order():
+    #10jqk
+    Pankou().big_order_list()
+
+
+def stats_bs_order():
+    Pankou().stock_bs_big_order()
+
+
+def save_multi_bs_order():
+    #保存分笔数据
+    StockSpider().save_multi_data()
+
+
+def count_bs_order():
+    #统计分笔数据
+    Pankou().stats_bs_order()
+
+
+def xq_ltgd():
+    #雪球流通股东
     StockSpider().get_ltgd()
 
 
+def xq_shareholdernum():
+    StockSpider().get_xueqiu_shareholdernum()
+
+
+def show_15():
+    #显示定期更新的股东人数
+    StockSpider().show_shareholdernum()
+
+
 def gudong():
-    F10().history_gudong()
+    #历史股东,龙虎榜,大单,5档挂单
+    F10().history_data()
 
 
 def gudong_name():
@@ -84,6 +120,43 @@ def gudong_name():
 
 def get_new_gudong():
     F10().get_new_gudong()
+
+
+def get_jj_gudong():
+    #基金持股家数
+    F10().get_jj_stock()
+
+
+def get_jj_hold():
+    F10().search_jj_list()
+
+
+def get_gudong_change():
+    F10().gudong_change()
+
+
+def get_gudong_zuhe():
+    #股东组合持仓
+    F10().gudong_zuhe_stock()
+
+
+def get_gudong_majia():
+    #股东共同操作特定股票
+    F10().find_zh_majia()
+
+
+def pankou_five_order():
+    #查看某只股票的5档盘口异常历史
+    Pankou().five_order_stock(sys.argv[2])
+
+
+def pankou_daily_five_order():
+    #每日异常
+    Pankou().five_daily_list(sys.argv[2])
+
+
+def history_lhb():
+    LhbDataSpider().show_daily_lhb()
 
 if __name__ == '__main__':
     import argparse

@@ -95,7 +95,8 @@ class sTools:
     def sWrite(self, text, filename='log.txt'):
         fp = open(filename, 'a+')
         #text = self.d_date() + " == " + text + "\n"
-        output = " %s == %s \n" % (self.d_date(), text)
+        #output = " %s == %s \n" % (self.d_date(), text)
+        output = "%s\n" % text
         fp.write(output)
 
     _benchmark = {}

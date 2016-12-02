@@ -48,6 +48,10 @@ class Abstract(object):
         self.config_path = os.path.dirname(__file__) + '/../../yyb.json'
         return self.file2dict(self.config_path)
 
+    def read_gudong_config(self):
+        self.config_path = os.path.dirname(__file__) + '/../../gudong.json'
+        return self.file2dict(self.config_path)
+
     def __read_config(self):
         """读取 config"""
         self.config_path = os.path.dirname(__file__) + '/../../config.json'
@@ -87,3 +91,34 @@ class Abstract(object):
             v.insert(0, code_map[e & 0x0000003D])
             hkeys.append(''.join(v))
         return hkeys
+
+    def change_scode(self, code):
+        a = code[0:1]
+        b = ''
+        if a == 6 or a == '6':
+            b = 'sh%s'
+        else:
+            b = 'sz%s'
+        return b % code
+
+    def yyb_category(self):
+        return {
+            'BD': '波段',
+            #'GD': '当股东',
+            'AAA': '重点',
+            'ZD': '未分类',
+            'WZB': '温州帮',
+            'ZJB': '浙江帮',
+            'NSB': '牛散',
+            'YZ': '游资',
+
+            'DJC': '待检测',
+            'CX': '长线',
+            'XYZ': '小游资',
+            'BKP-A': '大金不控',
+            'BKP-B': '不控盘',
+            'KP': '控盘',
+            'YZ-B': '砸盘游资',
+            'YZ-C': '三线游资',
+            'YZ-A': '一线游资'
+        }

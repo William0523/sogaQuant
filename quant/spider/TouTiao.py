@@ -28,7 +28,8 @@ class TouTiaoSpider(SpiderEngine):
         #头条列表
         print sys.argv
         self.tools.setup_logging(sys.argv[1], True, True)
-        _data = self.sGet('http://www.toutiao.com/api/article/recent/?source=2&count=20&category=video&max_behot_time=1470447756&utm_source=toutiao&offset=0&as=A185D70AF5B760A&cp=57A5D716505A2E1&max_create_time=1463846778&_=1470461440433')
+        #_data = self.sGet('http://www.toutiao.com/api/article/recent/?source=2&count=20&category=video&max_behot_time=1470447756&utm_source=toutiao&offset=0&as=A185D70AF5B760A&cp=57A5D716505A2E1&max_create_time=1463846778&_=1470461440433')
+        _data = self.sGet('http://www.toutiao.com/api/article/feed/?category=video&utm_source=toutiao&max_behot_time=1473424477&max_behot_time_tmp=1473424477&as=A1E5F7EDF3942FB&cp=57D304E21F1BAE1')
         #print _data
         #sys.exit()
         re = json.loads(_data)
@@ -37,20 +38,24 @@ class TouTiaoSpider(SpiderEngine):
         for i in range(0, len(re['data'])):
             if 'media_url' not in re['data'][i].keys():
                 continue
+            if 'ad' in re['data'][i].keys():
+                continue
             item = {}
             uid = re['data'][i]['media_url'].replace('http://toutiao.com/m', '')
             item['user_id'] = uid.replace('/', '')
             item['title'] = re['data'][i]['title']
-            item['tag'] = re['data'][i]['tag']
+            #item['tag'] = re['data'][i]['tag']
+            item['tag'] = 'video_funny'
             item['image_url'] = re['data'][i]['image_url']
-            item['item_seo_url'] = re['data'][i]['item_seo_url']
-            item['v_id'] = str(re['data'][i]['id'])
-            item['item_id'] = str(re['data'][i]['item_id'])
-            item['keywords'] = str(re['data'][i]['keywords'])
-            item['video_play_count'] = str(re['data'][i]['video_play_count'])
-            item['external_visit_count'] = str(re['data'][i]['external_visit_count'])
-            item['digg_count'] = str(re['data'][i]['digg_count'])
-            item['create_time'] = str(re['data'][i]['create_time'])
+            #item['item_seo_url'] = re['data'][i]['item_seo_url']
+            item['item_seo_url'] = str(re['data'][i]['group_id'])
+            item['v_id'] = str(re['data'][i]['group_id'])
+            item['item_id'] = str(re['data'][i]['group_id'])
+            item['keywords'] = ''
+            item['video_play_count'] = 10
+            item['external_visit_count'] = 20
+            item['digg_count'] = 12
+            item['create_time'] = time.time()
             item['video_id'] = ''
             item['video_url'] = ''
             #print item
@@ -62,14 +67,15 @@ class TouTiaoSpider(SpiderEngine):
                 self.qundb_online.dbInsert('video_contents', item)
 
             vauthor = {}
-            vauthor['media_name'] = re['data'][i]['media_name']
+            vauthor['media_name'] = re['data'][i]['source']
             vauthor['media_url'] = re['data'][i]['media_url']
-            vauthor['middle_image'] = re['data'][i]['middle_image']
+            vauthor['middle_image'] = ''
 
             _has = self.qundb_online.fetch_one("select * from video_author where media_url='%s'" % vauthor['media_url'])
             #print indata
             if _has is None:
                 self.qundb_online.dbInsert('video_author', vauthor)
+            #sys.exit()
 
     def run_post(self):
         #定时发布一次80

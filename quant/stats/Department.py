@@ -15,6 +15,73 @@ class Department(SpiderEngine):
         SpiderEngine.__init__(self)
 
     def daily(self):
+        #股东组合
+        self.PARTNER = self.read_gudong_config()
+        self.today = sys.argv[2]
+        #yyb_ids = []
+        #yyb_items = {}
+
+        stock = self.mysql.getRecord("select * from s_stock_list where 1")
+        stock_list = {}
+        for o in range(0, len(stock)):
+            stock_list[stock[o]['s_code']] = stock[o]
+
+        data = self.mysql.getRecord("select * from s_lhb_days_detail where dateline=%s" % self.today)
+        #当天入榜的营业部分组
+        dlist = {}
+        for k in range(0, len(data)):
+            if data[k]['yyb_id'] not in dlist.keys():
+                dlist[data[k]['yyb_id']] = []
+                ai = {
+                    'code': data[k]['s_code'],
+                    'T': data[k]['type'],
+                    'B': data[k]['B_volume']/10000,
+                    'B_p': data[k]['B_p'],
+                    'S': data[k]['S_volume']/10000,
+                    'S_P': data[k]['S_p'],
+                    'sort': data[k]['s_sort'],
+                    'yyb_id': data[k]['yyb_id'],
+                }
+            dlist[data[k]['yyb_id']].append(ai)
+
+        type_info = self.yyb_category()
+        #组合数据
+        for k, v in self.PARTNER.items():
+            #print k
+            #continue
+            for av in range(0, len(v)):
+                #print v[av]
+                #sys.exit()
+                is_show_title = 0
+                for j in range(0, len(v[av]['yyb'])):
+                    __yyb_id = v[av]['yyb'][j]['yyb_id']
+                    if __yyb_id == 0 or __yyb_id not in dlist.keys():
+                        continue
+                    #组合中当天有上榜
+                    if is_show_title == 0:
+                        is_B = u'【%s】【%s】【%s/%s/%s】=====' % (type_info[k], v[av]['level'], (av+1), k, v[av]['key'])
+                        print '\033[1;31;40m'
+                        print "%s%s" % ('*' * 10, is_B)
+                        print '\033[0m'
+
+                        is_show_title = 1
+                       # print is_B
+
+                    if __yyb_id in dlist.keys():
+                        for m in range(0, len(dlist[__yyb_id])):
+                            #print dlist[__yyb_id][m]['code']
+                            vm = dlist[__yyb_id][m]['B'] - dlist[__yyb_id][m]['S']
+                            vb = 'B'
+                            show_BS = ''
+                            if vm < 0:
+                                vb = 'S'
+                                if dlist[__yyb_id][m]['B'] > 0:
+                                    show_BS = "%s==%s" % (dlist[__yyb_id][m]['B'], dlist[__yyb_id][m]['S'])
+                            print "\t%s==%s====%s====%s%sW==%s===%s===%s" % (dlist[__yyb_id][m]['code'], stock_list[dlist[__yyb_id][m]['code']]['name'], v[av]['yyb'][j]['name'], vb, vm, show_BS, __yyb_id, 1)
+                #if name in v[av]['people']:
+                #    is_B = u'【%s】【%s/%s/%s】==%s==%s===' % (v[av]['level'], (av+1), k, v[av]['key'], name, opt)
+
+    def daily2(self):
         f_yyb = self.read_yyb_config()
         self.today = sys.argv[2]
         yyb_ids = []
