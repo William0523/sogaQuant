@@ -165,8 +165,8 @@ class StockSpider(SpiderEngine):
             i += 1
             if _has is None or _has['status'] == 3:
                 continue
-            if _has['id'] < 1464:
-                continue
+            #if _has['id'] < 1464:
+             #   continue
             #self.__get_shareholdernum(_has['s_code'].upper())
             _where = "s_code='%s' and enddate>%s " % (_has['s_code'], _dd)
             _has2 = self.mysql.fetch_one("select * from  s_stock_shareholdernum where %s" % _where)

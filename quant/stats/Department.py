@@ -32,18 +32,20 @@ class Department(SpiderEngine):
         for k in range(0, len(data)):
             if data[k]['yyb_id'] not in dlist.keys():
                 dlist[data[k]['yyb_id']] = []
-                ai = {
-                    'code': data[k]['s_code'],
-                    'T': data[k]['type'],
-                    'B': data[k]['B_volume']/10000,
-                    'B_p': data[k]['B_p'],
-                    'S': data[k]['S_volume']/10000,
-                    'S_P': data[k]['S_p'],
-                    'sort': data[k]['s_sort'],
-                    'yyb_id': data[k]['yyb_id'],
-                }
+            ai = {
+                'code': data[k]['s_code'],
+                'T': data[k]['type'],
+                'B': data[k]['B_volume']/10000,
+                'B_p': data[k]['B_p'],
+                'S': data[k]['S_volume']/10000,
+                'S_P': data[k]['S_p'],
+                'sort': data[k]['s_sort'],
+                'yyb_id': data[k]['yyb_id'],
+            }
             dlist[data[k]['yyb_id']].append(ai)
-
+        #print dlist[80138150]
+        #print dlist[80395709]
+        #sys.exit()
         type_info = self.yyb_category()
         #组合数据
         for k, v in self.PARTNER.items():

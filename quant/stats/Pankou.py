@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import sys
 import hashlib
 import re
 import commands
@@ -31,7 +32,7 @@ class Pankou(SpiderEngine):
         t = time.time()-60*86400
         listing_date = self.tools.d_date('%Y%m%d', t)
         #listing_date = 20151230
-        if stock['run_market'] > 40000000000 or stock['listing_date'] == 0 or stock['listing_date'] > listing_date or ms:
+        if stock['run_market'] > 30000000000 or stock['listing_date'] == 0 or stock['listing_date'] > listing_date or ms:
             res = True
         #大单统计使用
         if vd == 1:
@@ -399,7 +400,7 @@ class Pankou(SpiderEngine):
         i = 0
         while True:
             stock = self.mysql.getRecord("select * from s_stock_list where dateline=%s and id >%s limit 100" % (dateline, i))
-            print "select * from s_stock_list where dateline=%s and id >%s limit 100" % (dateline, i)
+            #print "select * from s_stock_list where dateline=%s and id >%s limit 100" % (dateline, i)
             #stock = self.mysql.getRecord("select * from s_stock_trade where dateline=%s limit %s ,100" % (dateline, i))
             if len(stock) == 0:
                 break
@@ -409,7 +410,7 @@ class Pankou(SpiderEngine):
                 self.__count_bs_detail(stock[o]['s_code'], dateline)
 
     def __count_bs_detail(self, s_code, dateline):
-        _dlist = self.mysql.getRecord("select * from s_stock_fenbi where s_code='%s' and dateline=%s" % (s_code, dateline))
+        _dlist = self.mysql.getRecord("select * from s_stock_fenbi_%s where s_code='%s' and dateline=%s" % (dateline, s_code, dateline))
         if len(_dlist):
             indata = {
                 's_code': s_code,
@@ -418,38 +419,39 @@ class Pankou(SpiderEngine):
                 'b_hands': 0,
                 's_price': 0,
                 's_hands': 0,
-                'bs_count': 0,
+                'zl_b': 0,
+                'zl_s': 0,
+                'bs_all': 0,
                 'bs_nums': 0,
 
-                'b_3': 0,
-                'b_5': 0,
-                'b_7': 0,
-                'b_10': 0,
-                's_3': 0,
-                's_5': 0,
-                's_7': 0,
-                's_10': 0,
+                'b_3': 0, 'b_5': 0, 'b_7': 0, 'b_10': 0,
+                's_3': 0, 's_5': 0, 's_7': 0, 's_10': 0,
 
             }
             #当天买入和卖出汇总
             b_count = 0
             s_count = 0
-            for i in range(0, len(_dlist)):
+            skip_count = 0
+            lmax = len(_dlist)
+            for i in range(0, lmax):
                 item = _dlist[i]
-                #中性买盘 同时数据小于100手 不统计
-                if item['s_type'] == 'M' and item['s_volume'] < 100:
+                #中性买盘 同时数据小于30手 不统计
+                if item['s_type'] == 'M' and item['s_volume'] < 30:
                     continue
                 indata['bs_nums'] += 1
                 _bk = 's'
                 if item['s_type'] == 'S' or item['s_type'] == 'M':
-                    indata['bs_count'] -= item['s_money']
+                    indata['bs_all'] -= item['s_money']
                     indata['s_hands'] += item['s_volume']
                     s_count += item['s_money']
                 else:
-                    indata['bs_count'] += item['s_money']
+                    indata['bs_all'] += item['s_money']
                     indata['b_hands'] += item['s_volume']
                     b_count += item['s_money']
                     _bk = 'b'
+                #主力 30W
+                if item['s_money'] > 300000:
+                    indata['zl_%s' % _bk] += item['s_money']
 
                 if item['s_volume'] >= 1000 and item['s_volume'] <= 3000:
                     indata['%s_3' % _bk] += 1
@@ -459,6 +461,14 @@ class Pankou(SpiderEngine):
                     indata['%s_7' % _bk] += 1
                 if item['s_volume'] > 7000:
                     indata['%s_10' % _bk] += 1
+                #跳价吃单异动 同时单笔金额大于30W
+                if i > 0 and i+1 < lmax:
+                    current = _dlist[i]
+                    next = _dlist[i+1]
+                    if next['s_price'] - current['s_price'] > 0.04 and next['s_money'] > 300000:
+                        #print _dlist[i+1]
+                        skip_count += 1
+            indata['skip_order'] = skip_count
 
             if indata['b_hands'] > 0:
                 indata['b_price'] = b_count/(indata['b_hands'] * 100)
@@ -467,20 +477,88 @@ class Pankou(SpiderEngine):
                 indata['s_price'] = s_count/(indata['s_hands'] * 100)
                 indata['s_price'] = "{:.2f}".format(indata['s_price'], '')
             print indata
+            #sys.exit()
 
             _where = "s_code='%s' and dateline=%s" % (s_code, dateline)
             _has = self.mysql.fetch_one("select * from  s_stock_fenbi_daily where %s" % _where)
             if _has is None:
                 self.mysql.dbInsert('s_stock_fenbi_daily', indata)
 
+    def _filter_bs_D(self):
+        dateline = sys.argv[2]
+        d_unix = time.mktime(time.strptime(dateline, '%Y%m%d'))
+        unix_time = d_unix - 86000
+        yestoday = datetime.fromtimestamp(unix_time).strftime('%Y%m%d')
+
+        sql = "select * from s_stock_fenbi_daily where zl_b-zl_s > 10000000 and  dateline in (%s, %s)" % (yestoday, dateline)
+        data = self.mysql.getRecord(sql)
+        tmp_list = {}
+        for i in range(0, len(data)):
+            if data[i]['s_code'] not in tmp_list.keys():
+                tmp_list[data[i]['s_code']] = []
+            tmp_list[data[i]['s_code']].append(data[i])
+        c = []
+        for k, v in tmp_list.items():
+            if len(v) == 2:
+                c.append(k)
+        return c
+
+    def stock_bs_skip_order(self):
+        #跳价吃单异动 同时单笔金额大于30W
+        dateline = sys.argv[2]
+        s_code = sys.argv[3]
+        kf = s_code[0:1]
+        if int(kf) == 6:
+            s_code = "sh%s" % s_code
+        else:
+            s_code = "sz%s" % s_code
+
+        sql = "SELECT * FROM s_stock_fenbi_%s where dateline=%s and s_code='%s'" % (dateline, dateline, s_code)
+        data = self.mysql.getRecord(sql)
+        lmax = len(data)
+        for i in range(1, lmax):
+            if i+1 >= lmax:
+                break
+            current = data[i]
+            next = data[i+1]
+            if next['s_price'] - current['s_price'] > 0.04 and next['s_money'] > 300000:
+                print "%s\t%s\t%s\t%s\t%s" % (current['s_time'], current['s_price'], next['s_price']-current['s_price'], next['s_volume'], int(next['s_money']/10000))
+
     def stock_bs_big_order(self):
         dateline = sys.argv[2]
-        data = self.mysql.getRecord("SELECT *  FROM `s_stock_fenbi_daily` WHERE `dateline` = %s AND (`b_10` > 1 or b_5 > 1 or b_7 >1) order by bs_count desc" % dateline)
+        if sys.argv[3] == 'A':
+            #无大单尽买入
+            sql = "SELECT *  FROM  `s_stock_fenbi_daily` AS a WHERE a.dateline =%s and bs_all>9000000 and b_3=0 and b_5=0 and b_7=0 and b_10=0 and bs_all >0 ORDER BY a.bs_all desc " % dateline
+        elif sys.argv[3] == 'B':
+            #尽买入
+            sql = "SELECT *  FROM `s_stock_fenbi_daily` WHERE `dateline` = %s AND (`b_10` > 0 or b_5 > 0 or b_7 >0) order by bs_all desc" % dateline
+        elif sys.argv[3] == 'C':
+            #大单买入3KW
+            sql = "SELECT *  FROM `s_stock_fenbi_daily` WHERE `dateline` = %s AND zl_b > 30000000 and zl_b > zl_s order by bs_all desc" % dateline
+        elif sys.argv[3] == 'D':
+            #连续大单流入2KW
+            c = self._filter_bs_D()
+            if len(c):
+                _sql = []
+                for _a in range(0, len(c)):
+                    _sql.append("'%s'" % c[_a])
+                sql = "SELECT *  FROM `s_stock_fenbi_daily` WHERE `dateline` = %s AND s_code in(%s)" % (dateline, ",".join(_sql))
+            else:
+                self.print_green("No Data...")
+                return
+        elif sys.argv[3] == 'E':
+            #self._filter_bs_E(20161220, 'sz300153')
+            #self.stock_bs_skip_order()
+            sql = "SELECT * FROM `s_stock_fenbi_daily` WHERE `dateline` = %s and skip_order >5 order by skip_order desc " % dateline
+
+        self.ak = 0
+
+        data = self.mysql.getRecord(sql)
         stock = self.mysql.getRecord("select * from s_stock_list where 1")
         self.stock_list = {}
 
         show_five_order = 0
-        if len(sys.argv) == 4:
+        if len(sys.argv) == 5:
             show_five_order = 1
 
         for o in range(0, len(stock)):
@@ -488,13 +566,14 @@ class Pankou(SpiderEngine):
             self.stock_list[tmp_code] = stock[o]
 
         if len(data) > 0:
-            attributes = ["Name", "Chg", "Buy", "Sell", "All", "B3", "B5", "B7", "B10"]
+            attributes = ["Name", "Chg", "Buy", "Sell", "All", "Skip", "B3", "B5", "B7", "B10"]
             table = pylsytable(attributes)
             _name = []
             _chg = []
             _buy = []
             _sell = []
             _all = []
+            _skip = []
             _b_3 = []
             _b_5 = []
             _b_7 = []
@@ -503,13 +582,21 @@ class Pankou(SpiderEngine):
                 ms = re.findall(re.compile(r'\*|N|ST|航空|银行'), self.stock_list[data[o]['s_code']]['name'])
                 if self.stock_list[data[o]['s_code']]['run_market'] > 15000000000 or self.stock_list[data[o]['s_code']]['listing_date'] == 0 or ms:
                     continue
-                if data[o]['bs_count'] < -80000000:
+                if data[o]['bs_all'] < -80000000:
                     continue
+                self.ak += 1
+                #最近5天的主买平均小于1000W
+                #res = self._avg_buy(data[o]['s_code'])
+                #if res > 0 and res < 12000000:
+                #    continue
+                _skip.append(data[o]['skip_order'])
                 _name.append("%s=%s" % (data[o]['s_code'], self.stock_list[data[o]['s_code']]['name']))
                 _chg.append(self.stock_list[data[o]['s_code']]['chg'])
-                _buy.append("%s=%s" % (data[o]['b_price'], data[o]['b_hands']))
-                _sell.append("%s=%s" % (data[o]['s_price'], data[o]['s_hands']))
-                _all.append("{:.2f}".format(data[o]['bs_count']/10000, ''))
+                #_buy.append("%s=%s" % (data[o]['b_price'], data[o]['b_hands']))
+                #_sell.append("%s=%s" % (data[o]['s_price'], data[o]['s_hands']))
+                _buy.append(data[o]['zl_b'])
+                _sell.append(data[o]['zl_s'])
+                _all.append("{:.2f}".format(data[o]['bs_all']/10000, ''))
                 _b_3.append("%s=%s" % (data[o]['b_3'], data[o]['s_3']))
                 _b_5.append("%s=%s" % (data[o]['b_5'], data[o]['s_5']))
                 _b_7.append("%s=%s" % (data[o]['b_7'], data[o]['s_7']))
@@ -522,318 +609,26 @@ class Pankou(SpiderEngine):
             table.add_data("Buy", _buy)
             table.add_data("Sell", _sell)
             table.add_data("All", _all)
+            table.add_data("Skip", _skip)
             table.add_data("B3", _b_3)
             table.add_data("B5", _b_5)
             table.add_data("B7", _b_7)
             table.add_data("B10", _b_10)
             if show_five_order == 0:
                 print(table.__str__())
+        print u"==========共有%s=====" % self.ak
 
-    def big_order_list(self):
-        #大单一笔超过400W成交,或一次成交1000手  and s_code in ('sz300089', 'sz002695','sz300482')
-        #nmax = 400
-        #nvmax = 100000
-        self.today = sys.argv[2]
-        self.ax = self.mysql.getRecord("SELECT * FROM  `s_stock_big_order` WHERE  `dateline` =%s AND (`bs_money` >=400 OR (`bs_money` >=200 AND  `bs_volume` >100000))  GROUP BY s_code" % self.today)
-        stock = self.mysql.getRecord("select * from s_stock_list where 1")
-        self.stock_list = {}
-
-        for o in range(0, len(stock)):
-            tmp_code = stock[o]['s_code']
-            self.stock_list[tmp_code] = stock[o]
-
-        self.bdata = {}
-        self.ak = 0
-        self.all_codes = []
-        for i in range(0, len(self.ax)):
-            _s_code = self.ax[i]['s_code']
-            if self.stock_list[_s_code]['run_market'] > 12000000000:
-                continue
-            #if _s_code != 'sz002433':
-            #    continue
-            if _s_code not in self.all_codes:
-                self.bdata[_s_code] = {
-                    'v_buy': 0,
-                    'v_buy_num': 0,
-                    'v_buy_max': 0,
-                    'v_sell': 0,
-                    'v_sell_num': 0,
-                    'v_bs_rate': 0,
-                    'items': []
-                }
-            ab = self.mysql.getRecord("SELECT * FROM `s_stock_big_order` WHERE dateline=%s and s_code='%s' order by datetime asc" % (self.today, self.ax[i]['s_code']))
-            for k in range(0, len(ab)):
-                if ab[k]['bs_type'] == 'B':
-                    self.bdata[_s_code]['v_buy'] += ab[k]['bs_money']
-                    self.bdata[_s_code]['v_buy_num'] += 1
-                    self.bdata[_s_code]['v_buy_max'] = max(self.bdata[_s_code]['v_buy_max'], ab[k]['bs_money'])
-                elif ab[k]['bs_type'] == 'S':
-                    self.bdata[_s_code]['v_sell'] += ab[k]['bs_money']
-                    self.bdata[_s_code]['v_sell_num'] += 1
-
-                self.bdata[_s_code]['items'].append(ab[k])
-
-        if sys.argv[3] == 'A':
-            #买卖中单笔出现400W
-            self._filter_A()
-        elif sys.argv[3] == 'B':
-            #按买卖量比 大于1 同时涨幅小于4
-            self._filter_B()
-        elif sys.argv[3] == 'C':
-            self._filter_C()
-        print "==========共有%s=====" % self.ak
-
-    def _filter_A(self):
-        '''
-        买卖中单笔出现400W
-        '''
-        codes = []
-        for k, v in self.bdata.items():
-            if v['v_buy_max'] < 400:
-                continue
-            if k not in codes:
-                #print k
-                print '\033[1;31;40m'
-                print "==%s==%s==BUY:%s/%s==SELL:%s/%s==%s==" % (k, self.stock_list[k]['name'], v['v_buy'], v['v_buy_num'], v['v_sell'], v['v_sell_num'], self.stock_list[k]['chg'])
-                print '\033[0m'
-                codes.append(k)
-                self.ak += 1
-            for kk in range(0, len(v['items'])):
-                aitem = v['items'][kk]
-                if aitem['bs_money'] >= 400:
-                    print "\t%s==%s==%s==%s==%s" % (aitem['datetime'], aitem['bs_type'], aitem['bs_volume'], aitem['bs_money'], aitem['price'])
-
-    def _filter_B(self):
-        '''
-        按买卖量比 大于1 同时涨幅小于4
-        '''
-        abc = 1
-        codes = []
-        axb = []
-        for k, v in self.bdata.items():
-            #买盘为0或都小于1500W过滤
-            if v['v_buy'] == 0 or v['v_buy'] < 1500:
-                continue
-
-            v_bs_rate = v['v_buy']
-            if v['v_sell'] > 0:
-                v_bs_rate = v['v_buy']/v['v_sell']
-
-            if (v['v_buy'] < v['v_sell'] and v_bs_rate < 0.5) or (v['v_buy']+v['v_sell']) < 1000:
-                continue
-
-            if v_bs_rate < 1 or self.stock_list[k]['chg'] > 9:
-                continue
-            axb.append({k: v_bs_rate, 'v_rate': v_bs_rate})
-
-        #排序
-        from operator import itemgetter
-        axb = sorted(axb, key=itemgetter('v_rate'), reverse=True)
-
-        for ak in range(0, len(axb)):
-            k = axb[ak].keys()
-            #print k
-            #取key 会变换key的位置
-            if k[0] == 'v_rate':
-                k = k[1]
-            else:
-                k = k[0]
-            v = self.bdata[k]
-            c = axb[ak].values()
-            if k not in codes:
-                if abc == 1:
-                    print k
-                else:
-                    print '\033[1;31;40m'
-                    print "==%s==%s==BUY:%s/%s==SELL:%s/%s=【LB=%s】=【Chg=%s】==" % (k, self.stock_list[k]['name'], v['v_buy'], v['v_buy_num'], v['v_sell'], v['v_sell_num'], round(c[0], 2), self.stock_list[k]['chg'])
-                    print '\033[0m'
-
-                codes.append(k)
-                self.ak += 1
-            for kk in range(0, len(v['items'])):
-                aitem = v['items'][kk]
-                #if aitem['bs_money'] >= nmax or (aitem['bs_volume'] >= nvmax and aitem['bs_money'] > 200):
-                if abc == 0:
-                    print "\t%s==%s==%s==%s==%s" % (aitem['datetime'], aitem['bs_type'], aitem['bs_volume'], aitem['bs_money'], aitem['price'])
-
-    def _filter_C(self):
-        '''
-        按买盘超过2KW
-        '''
-        abc = 1
-        codes = []
-        axb = []
-        for k, v in self.bdata.items():
-            #买盘为0或都小于1500W过滤
-            if v['v_buy'] == 0 or v['v_buy'] < 4000 or v['v_buy'] < v['v_sell']:
-                continue
-
-            v_bs_rate = v['v_buy']
-            if v['v_sell'] > 0:
-                v_bs_rate = v['v_buy']/v['v_sell']
-
-            if (v['v_buy'] < v['v_sell'] and v_bs_rate < 0.5) or (v['v_buy']+v['v_sell']) < 1000:
-                continue
-
-            #if v_bs_rate < 1 or self.stock_list[k]['chg'] > 4:
-            #    continue
-            axb.append({k: v_bs_rate, 'v_rate': v_bs_rate})
-
-        #排序
-        from operator import itemgetter
-        axb = sorted(axb, key=itemgetter('v_rate'), reverse=True)
-        for ak in range(0, len(axb)):
-            k = axb[ak].keys()
-            #print k
-            #取key 会变换key的位置
-            if k[0] == 'v_rate':
-                k = k[1]
-            else:
-                k = k[0]
-            v = self.bdata[k]
-            c = axb[ak].values()
-
-            if k not in codes:
-                if abc == 1:
-                    print k
-                else:
-                    print '\033[1;31;40m'
-                    print "==%s==%s==BUY:%s/%s==SELL:%s/%s=【LB=%s】=【Chg=%s】==" % (k, self.stock_list[k]['name'], v['v_buy'], v['v_buy_num'], v['v_sell'], v['v_sell_num'], round(c[0], 2), self.stock_list[k]['chg'])
-                    print '\033[0m'
-
-                codes.append(k)
-                self.ak += 1
-            '''
-            for kk in range(0, len(v['items'])):
-                aitem = v['items'][kk]
-                #if aitem['bs_money'] >= nmax or (aitem['bs_volume'] >= nvmax and aitem['bs_money'] > 200):
-                if abc == 0:
-                    print "\t%s==%s==%s==%s==%s" % (aitem['datetime'], aitem['bs_type'], aitem['bs_volume'], aitem['bs_money'], aitem['price'])
-            '''
-
-    def _get_big_order(self, page):
-        #同花顺实时获取
-        URL = 'http://data.10jqka.com.cn/funds/ddzz/order/asc/page/%s/ajax/1/' % page
-        data = self.sGet(URL, 'utf-8')
-        print "=======%s========" % len(data)
-        _vprint = self.sMatch('<tr(.*?)>', '<\/tr>', data, 0)
-        for i in range(1, len(_vprint)):
-            _vtd = self.sMatch('<td(.*?)>', '<\/td>', _vprint[i][1], 0)
-            s_code = self.change_scode(self.tools.strip_tags(_vtd[1][1]))
-            #print self.tools.strip_tags(_vtd[1][1])
-            ctime = _vtd[0][1].replace(':', '')
-            ctime = ctime.replace(' ', '')
-            ctime = ctime.replace('-', '')
-            _hash_str = "%s%s" % (s_code, ctime)
-            vtype = 'S'
-            if _vtd[6][1] == u'买盘':
-                vtype = 'B'
-            indata = {
-                'hash_str': _hash_str,
-                'datetime': _vtd[0][1],
-                's_code': s_code,
-                'price': _vtd[3][1],
-                'bs_volume': _vtd[4][1],
-                'bs_type': vtype
-            }
-            _has = self.mysql.fetch_one("select * from  s_stock_big_order where hash_str='%s'" % _hash_str)
-            if _has is None:
-                self.mysql.dbInsert('s_stock_big_order', indata)
-            print indata
-
-    def save_stock_big_order(self):
-        #按当日开盘数据获取大单情况
-        today = self.tools.d_date('%Y-%m-%d')
-        self.today = sys.argv[2]
-        ax = self.mysql.getRecord("select id,s_code,code,close,last_close,listing_date,run_market,name,chg from s_stock_list where id>=1 and  dateline=%s" % self.today)
-
-        for x in range(0, len(ax)):
-            #黑名单
-            if self.__filter_code(ax[x], 1):
-                continue
-            URL = 'http://data.10jqka.com.cn/funds/dddetail/code/%s' % ax[x]['code']
-            #URL = 'http://data.10jqka.com.cn/funds/dddetail/code/000008'
-            print URL
-            a = ax[x]['s_code'][0:2]
-            if a == 'sh':
-                continue
-
-            #data = self.sGet(URL, 'gbk')
-            out_put = '/usr/bin/php /htdocs/quant/c.php %s' % base64.b64encode(URL)
-            #print out_put
-            data = commands.getoutput(out_put)
-            data = data.decode("gbk", 'ignore')
-            #print data
-            s_code = ax[x]['s_code']
-
-            _tdbody = self.sMatch('<tbody(.*?)>', '<\/tbody>', data, 0)
-            if len(_tdbody) == 0:
-                print "%s=======Not Found" % s_code
-                continue
-            #print _tdbody
-            _pb = self.sMatch(u'大单总买盘：', u'万', data, 0)
-            _ps = self.sMatch(u'大单总卖盘：', u'万', data, 0)
-
-            #print _pb
-            #sys.exit()
-
-            if _pb == '0' and _ps != '0':
-                print "======================================"
-                sys.exit()
-
-            if _pb[0] != '0':
-                _buy = self.sMatch('<tr(.*?)>', '<\/tr>', _tdbody[0][1], 0)
-                if _buy is not None:
-                    for i in range(0, len(_buy)):
-                        _buy_detail = self.sMatch('<td(.*?)>', '<\/td>', _buy[i][1], 0)
-                        #print _buy_detail
-                        time = "%s %s" % (today, _buy_detail[0][1])
-                        _hash_str = "%s%s%s" % (s_code, today, _buy_detail[0][1])
-                        _hash_str = _hash_str.replace(':', '')
-                        _hash_str = _hash_str.replace('-', '')
-
-                        indata = {
-                            'hash_str': _hash_str,
-                            'datetime': time,
-                            'dateline': self.today,
-                            's_code': s_code,
-                            'price': _buy_detail[1][1],
-                            'bs_volume': _buy_detail[2][1],
-                            'bs_money': _buy_detail[3][1],
-                            'bs_type': 'B'
-                        }
-                        _has = self.mysql.fetch_one("select * from  s_stock_big_order where hash_str='%s'" % _hash_str)
-                        if _has is None:
-                            self.mysql.dbInsert('s_stock_big_order', indata)
-            if _ps[0] != '0':
-                if _pb[0] == '0':
-                    _sell = self.sMatch('<tr(.*?)>', '<\/tr>', _tdbody[0][1], 0)
-                else:
-                    _sell = self.sMatch('<tr(.*?)>', '<\/tr>', _tdbody[1][1], 0)
-
-                if _sell is not None:
-                    for i in range(0, len(_sell)):
-                        _sell_detail = self.sMatch('<td(.*?)>', '<\/td>', _sell[i][1], 0)
-                        time = "%s %s" % (today, _sell_detail[0][1])
-                        _hash_str = "%s%s%s" % (s_code, today, _sell_detail[0][1])
-                        _hash_str = _hash_str.replace(':', '')
-                        _hash_str = _hash_str.replace('-', '')
-
-                        indata = {
-                            'hash_str': _hash_str,
-                            'datetime': time,
-                            'dateline': self.today,
-                            's_code': s_code,
-                            'price': _sell_detail[1][1],
-                            'bs_volume': _sell_detail[2][1],
-                            'bs_money': _sell_detail[3][1],
-                            'bs_type': 'S'
-                        }
-                        _has = self.mysql.fetch_one("select * from  s_stock_big_order where hash_str='%s'" % _hash_str)
-                        if _has is None:
-                            self.mysql.dbInsert('s_stock_big_order', indata)
-
-            print "%s===%s====%s========" % (ax[x]['id'], s_code, len(data))
+    def _avg_buy(self, s_code):
+        #最近5天主力平均买入
+        _list = self.mysql.getRecord("SELECT * FROM s_stock_fenbi_daily WHERE s_code='%s' order by dateline desc limit 5 " % s_code)
+        res = 0
+        if len(_list):
+            _max = len(_list)
+            _count = 0
+            for x in range(0, _max):
+                _count += int(_list[x]['zl_b'])
+            res = int(_count/_max)
+        return res
 
     def five_daily_list(self, day):
         #5档日常异常数据

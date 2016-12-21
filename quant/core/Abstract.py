@@ -111,6 +111,7 @@ class Abstract(object):
             'ZJB': '浙江帮',
             'NSB': '牛散',
             'YZ': '游资',
+            'JJJ': '基金',
 
             'DJC': '待检测',
             'CX': '长线',
@@ -122,3 +123,9 @@ class Abstract(object):
             'YZ-C': '三线游资',
             'YZ-A': '一线游资'
         }
+
+    def print_green(self, msg):
+        print "\033[0;32;40m %s \033[0m" % msg
+
+    def print_red(self, msg):
+        print "\033[1;31;40m %s \033[0m" % msg

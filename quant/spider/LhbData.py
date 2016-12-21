@@ -4,7 +4,6 @@ import time
 import datetime
 import logging
 from quant.core.Spider import *
-from pylsy import pylsytable
 
 
 class LhbDataSpider(SpiderEngine):
@@ -21,19 +20,7 @@ class LhbDataSpider(SpiderEngine):
     def run(self):
         print sys.argv
         self.tools.setup_logging(sys.argv[1], True, True)
-        '''
-        day_list = self.mysql.getRecord("SELECT * FROM s_lhb WHERE 1")
-        for i in range(520, len(day_list)):
-            print "====%s" % i
-            if day_list[i]['codex'] == 8888:
-                continue
-            print day_list[i]['id']
-            self.get_yyb_last_dateline(day_list[i]['codex'])
-            time.sleep(1)
 
-        sys.exit()
-        return True
-        '''
         #self.get_city_yyb()
         #sys.exit()
 
@@ -48,6 +35,8 @@ class LhbDataSpider(SpiderEngine):
 
         logging.debug('Start Daily Lhb=====LhbCount:%s ' % sys.argv[2])
         self.count_detail(sys.argv[2])
+
+        self.get_last_dateline(sys.argv[2])
 
         #self.get_city_yyb()
         return True
@@ -74,7 +63,7 @@ class LhbDataSpider(SpiderEngine):
             if xd[0] not in has:
                 self.get_yyb_data(xd[0])
         '''
-    def get_yyb_last_dateline(self, ds):
+    def __get_yyb_last_dateline(self, ds):
         #ds = 80135988
         url = "http://data.eastmoney.com/DataCenter_V3/stock2016/jymx.ashx?pagesize=50&page=1&js=var+fguIHta&param=&sortRule=-1&sortType=&gpfw=0&code=%s&rt=24462227" % ds
         a = self.sGet(url)
@@ -90,6 +79,38 @@ class LhbDataSpider(SpiderEngine):
                 #print last_date
 
                 #sys.exit()
+    def get_last_dateline(self, ds):
+        #先查当天龙虎榜中出现的，但不在s_lhb表
+        d = ds
+        daily_list = self.mysql.getRecord("SELECT * FROM s_lhb_days_detail WHERE dateline = %s" % d)
+
+        for a in range(0, len(daily_list)):
+            yyb_id = daily_list[a]['yyb_id']
+            _has = self.mysql.fetch_one("select * from  s_lhb where codex=%s" % yyb_id)
+            _where = "codex=%s" % yyb_id
+            indata = {
+                'last_dateline': d
+            }
+            if _has is not None:
+                self.mysql.dbUpdate('s_lhb', indata, _where)
+            else:
+                indata['codex'] = yyb_id
+                indata['name'] = u'没有名字'
+                indata['lhds_group'] = ''
+                indata['province'] = ''
+                indata['city'] = ''
+                print "========no Name..........."
+                self.mysql.dbInsert('s_lhb', indata)
+        '''
+        day_list = self.mysql.getRecord("SELECT * FROM s_lhb WHERE id > 3143")
+        for i in range(0, len(day_list)):
+            print "====%s" % i
+            if day_list[i]['codex'] == 8888:
+                continue
+            print "=%s====%s====%s" % (day_list[i]['id'], day_list[i]['codex'], day_list[i]['name'])
+            self.__get_yyb_last_dateline(day_list[i]['codex'])
+            #time.sleep(1)
+        '''
 
     def get_city_yyb(self):
         url = "http://data.eastmoney.com/stock/yybcx.html"
@@ -122,6 +143,7 @@ class LhbDataSpider(SpiderEngine):
                 if _has is not None:
                     self.mysql.dbUpdate('s_lhb', indata, _where)
                 else:
+                    indata['last_dateline'] = datetime.strftime(date.today(), "%Y%m%d")
                     self.mysql.dbInsert('s_lhb', indata)
 
     def get_daily_detail(self, s_data, dateline):
@@ -228,14 +250,16 @@ class LhbDataSpider(SpiderEngine):
         logging.debug('GetUrl:%s  Length:%s' % (url, len(_data)))
         print len(_data)
         #sys.exit()
-        _tr = self.sMatch('<td class="tip-trigger" code="(.*?)">', '<\/td>', _data, 0)
+        _tr = self.sMatch('<td class="tip-trigger" code="(.*?)"', 'type', _data, 0)
         _vprint = self.sMatch('<td class=" c_eq">', '<\/td>', _data, 0)
-        print _tr
+        #print _tr
         #sys.exit()
         for i in range(0, len(_tr)):
 
             s_code = _tr[i][0]
+            #print s_code
             _prx = s_code[0:1]
+
             if int(_prx) not in [0, 3, 6]:
                 print "what"
                 continue
@@ -299,112 +323,3 @@ class LhbDataSpider(SpiderEngine):
                     'dateline': dateline
                 }
                 self.mysql.dbInsert('s_lhb_daily', indata)
-
-    def show_daily_lhb(self):
-        s_code = self.change_scode(sys.argv[2])
-        start_date = 20150610
-        show_table_max = 4
-        x = self.mysql.getRecord("SELECT a.*,b.codex,b.name FROM  `s_lhb_days_detail` as a left join s_lhb as b on a.yyb_id=b.codex WHERE  a.s_code='%s' and dateline >=%s order by dateline desc " % (s_code, start_date))
-        if len(x):
-            #先按天归类
-            daily_yyb = {}
-            daily_yyb2 = {}
-            attributes = ["ID", "Name", "Num"]
-            table_attr = ["Name"]
-
-            tdheader = ['<tr height="40"><th width="60" bgColor="#CCCCCC" align="center">ID</th>', '<th width="100" bgColor="#CCCCCC" align="center">Name</th>', '<th width="30" bgColor="#CCCCCC" align="center">Num</th>']
-            for a in range(0, len(x)):
-                key = "D%s" % x[a]['dateline']
-                if key not in attributes:
-                    attributes.append(key)
-                    tdheader.append('<th width="120" bgColor="#CCCCCC" align="center">%s</th>' % key)
-                    if len(table_attr) < show_table_max:
-                        table_attr.append(key)
-
-                if x[a]['name'] is None:
-                    x[a]['name'] = "YYB-%s" % x[a]['yyb_id']
-                if x[a]['name'] not in daily_yyb.keys():
-                    daily_yyb[x[a]['name']] = []
-
-                daily_yyb[x[a]['name']].append(x[a])
-                _name_key = "D%s|%s" % (x[a]['dateline'], x[a]['name'])
-                if _name_key not in daily_yyb2.keys():
-                    daily_yyb2[_name_key] = []
-                daily_yyb2[_name_key].append(x[a])
-
-            tdheader.append('</tr>')
-
-            name_list = []
-            table_td_list = {}
-            show_table = pylsytable(table_attr)
-            #
-
-            #print "====".join(tdheader)
-            #sys.exit()
-            all_tr_list = []
-            for _name, v in daily_yyb.items():
-                #制作每一行数据
-                _name2 = _name.replace('证券股份有限公司', '')
-                _name2 = _name2.replace('证券有限公司', '')
-                _name2 = _name2.replace('证券有限责任公司', '')
-                _name2 = _name2.replace('证券营业部', '')
-
-                #显示最近5次有龙虎榜
-                name_list.append(_name2)
-                for d in range(1, len(table_attr)):
-                    _name_key = "%s|%s" % (table_attr[d], _name)
-                    #if _name_key in daily_yyb2:
-                        #tr_data.append(12)
-                    if table_attr[d] not in table_td_list.keys():
-                        table_td_list[table_attr[d]] = []
-
-                    BS_str = ''
-                    if _name_key in daily_yyb2:
-                        BS_strA = "%s%s=%s=%s" % (daily_yyb2[_name_key][0]['type'], daily_yyb2[_name_key][0]['s_sort'], self._format_money(daily_yyb2[_name_key][0]['B_volume']), self._format_money(daily_yyb2[_name_key][0]['S_volume']))
-                        BS_strB = ''
-                        if len(daily_yyb2[_name_key]) > 1:
-                            BS_strB = "%s%s=%s=%s" % (daily_yyb2[_name_key][1]['type'], daily_yyb2[_name_key][1]['s_sort'], self._format_money(daily_yyb2[_name_key][1]['B_volume']), self._format_money(daily_yyb2[_name_key][1]['S_volume']))
-                        BS_str = u"%s=%s==" % (BS_strA, BS_strB)
-                    table_td_list[table_attr[d]].append(BS_str)
-
-                tr_data = ["%s" % v[0]['yyb_id'], _name2, 0]
-                #周期内出现的天数
-                _has_num = 0
-                for b in range(3, len(attributes)):
-                    _name_key = "%s|%s" % (attributes[b], _name)
-
-                    BS_str = ''
-                    if _name_key in daily_yyb2:
-                        _has_num += 1
-                        #营业部做T
-                        BS_strA = "%s%s=%s=%s" % (daily_yyb2[_name_key][0]['type'], daily_yyb2[_name_key][0]['s_sort'], self._format_money(daily_yyb2[_name_key][0]['B_volume']), self._format_money(daily_yyb2[_name_key][0]['S_volume']))
-                        BS_strB = ''
-                        if len(daily_yyb2[_name_key]) > 1:
-                            BS_strB = "%s%s=%s=%s" % (daily_yyb2[_name_key][1]['type'], daily_yyb2[_name_key][1]['s_sort'], self._format_money(daily_yyb2[_name_key][1]['B_volume']), self._format_money(daily_yyb2[_name_key][1]['S_volume']))
-                        BS_str = u"%s\n%s==\n" % (BS_strA, BS_strB)
-                    tr_data.append(BS_str)
-                tr_data[2] = _has_num
-
-                _td_str = ['<tr height="40">']
-                for c in range(0, len(tr_data)):
-                    _td_str.append('<td bgColor="#FFFFFF" align="center">%s</td>' % tr_data[c])
-                _td_str.append('</tr>')
-
-                all_tr_list.append("\n".join(_td_str))
-
-        if len(sys.argv) == 3:
-            table = '<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title></title></head><body>\n\
-                <table border="1" width="1024">%s\n%s</table></body></html>' % ("\n".join(tdheader), "\n".join(all_tr_list))
-            print table
-        else:
-            for b in range(1, len(table_attr)):
-                show_table.add_data(table_attr[b], table_td_list[table_attr[b]])
-            show_table.add_data("Name", name_list)
-            print(show_table.__str__())
-
-    def _format_money(self, m):
-        res = 0
-        if m > 0:
-            res = m/10000
-            res = '%.2f' % res
-        return res

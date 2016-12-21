@@ -16,27 +16,6 @@ black_list = [
     '80010104'
 ]
 
-'''
-中国中投证券有限责任公司广州珠江东路证券营业部
-银河资本-光大银行-银河资本-穗富2号资产管理计划
-
-联讯证券股份有限公司广州东风中路证券营业部
-广东粤财信托有限公司-穗富1号证券投资集合资金信托计划
-
-#光大证券股份有限公司宁波中山西路证券营业部
-上海七曜投资管理合伙企业(有限合伙)-安洪盈私募证券投资基金
-
-80348562 西南证券股份有限公司西宁五四大街
-深圳鑫泉资本管理有限公司-鑫泉复利增长1期私募基金
-
-光大证券股份有限公司苏州苏惠路证券营业部
-中信信托有限责任公司-中信稳健分层型证券投资集合资金信托计划1511F期
-
-80040104 中银国际证券有限责任公司上海欧阳路
-上海芮泰投资管理有限公司-芮泰投资上海怡鸣成长一号证券投资基金
-
-'''
-
 #最大35个交易日数据
 MAX_BIG_ORDER_LIST = 35
 #5档一天最多显示次数
@@ -235,7 +214,7 @@ class F10(StatsEngine):
             print "%s===%s===%s===%s===%s===%s===%sW===%s" % (result[a]['sh_rank'], result[a]['sh_code'], self.__clear_gudong_name(result[a]['sh_name']), result[a]['ishis'], result[a]['sh_shares'], result[a]['sh_shares_p'], this_money, result[a]['chg'])
             print '\033[0m'
             #股东个人新进个数大于等于3个
-            if result[a]['sh_type'] == u'个人' and result[a]['ishis'] == u'【新进】':
+            if result[a]['sh_type'] == '个人' and result[a]['ishis'] == '【新进】':
                 is_new_num += 1
 
             if is_new_num == 3:
@@ -260,9 +239,9 @@ class F10(StatsEngine):
 
         self.s_code = s_code
 
-        show_five_order = 0
+        show_five_order = 1
         if len(sys.argv) == 4:
-            show_five_order = 1
+            show_five_order = 0
 
         stock = self.mysql.getRecord("select * from s_stock_list where 1")
         stock_list = {}
@@ -310,7 +289,7 @@ class F10(StatsEngine):
                     'sh_rank': prev_gd[i]['sh_rank'],
                     'sh_shares': prev_gd[i]['sh_shares'],
                     'sh_shares_p': prev_gd[i]['sh_shares_p'],
-                    'ishis': u'退出',
+                    'ishis': '退出',
                     'chg': prev_gd[i]['chg'],
                     'prev_list': []
                 }
@@ -390,6 +369,8 @@ class F10(StatsEngine):
             print '\033[1;31;40m'
             this_money = int(result[a]['sh_shares'] * stock_list[result[a]['s_code']]['close'])
             print "%s==%s==%s==%s==%s==%sW==%s" % (result[a]['sh_rank'], result[a]['sh_code'], self.__clear_gudong_name(result[a]['sh_name']), result[a]['ishis'], round(result[a]['sh_shares'], 2), this_money, int(result[a]['chg']))
+            #print "%s==%s==%s==%s==%s==%sW==%s" % (result[a]['sh_rank'], result[a]['sh_code'], self.__clear_gudong_name(result[a]['sh_name']), 1, round(result[a]['sh_shares'], 2), this_money, int(result[a]['chg']))
+
             print '\033[0m'
 
             ms = re.findall(re.compile(r'全国社保基金'), result[a]['sh_name'])
@@ -408,7 +389,7 @@ class F10(StatsEngine):
                     if bitem['s_code'] == s_code:
                         continue
                     #超过10个不展示
-                    if bitem['sh_type'] != '个人' and ak > 10:
+                    if bitem['sh_type'] != u'个人' and ak > 10:
                         continue
                     ak += 1
                     #持仓市值
@@ -426,7 +407,7 @@ class F10(StatsEngine):
                     if bitem['s_code'] == s_code:
                         continue
                     #if bitem['s_code'] not in current_hold:
-                    aishis = u'退出'
+                    aishis = '退出'
                     print "%s===%s===%s===%s===%s===%s===%s" % ('\t' * 1, bitem['s_code'], stock_list[bitem['s_code']]['name'], bitem['sh_rank'], aishis, round(bitem['sh_shares'], 2), int(bitem['chg']))
 
         print '\033[1;31;43m'
@@ -464,71 +445,105 @@ class F10(StatsEngine):
                         #hold_money = int(hold_money/10000)
                         print "%s===%s===%s===%s===%s===%s===%sW===%s" % ('\t' * 1, bitem['s_code'], stock_list[bitem['s_code']]['name'], bitem['sh_rank'], aishis, round(bitem['sh_shares'], 2), hold_money, int(bitem['chg']))
         #股东人数变化
-        print '\033[1;31;40m'
-        print "================================股东人数变化================================"
-        print '\033[0m'
+
+        self.print_red("================================股东人数变化================================")
         self.__get_gudong_nums(s_code.lower())
 
         #code_list 包含所有这次查询的股票池，和营业部数据进去匹配
-        print '\033[1;31;40m'
-        print "================================龙虎榜数据================================"
-        print '\033[0m'
+        self.print_red("================================龙虎榜数据================================")
         self.__get_yyb_operate_code(s_code.lower())
 
         if show_five_order == 1:
-            print '\033[1;31;40m'
-            print "================================5档挂单================================"
-            print '\033[0m'
+            self.print_red("================================5档挂单================================")
             #5档持单数据,最近半年
             self.__get_five_order(s_code.lower())
 
-            print '\033[1;31;40m'
-            print "================================大单成交================================"
-            print '\033[0m'
-            self.__get_big_order(s_code.lower())
+            #self.print_red("================================大单成交================================")
+            #self.__get_big_order(s_code.lower())
 
-            print '\033[1;31;40m'
-            print "================================每日买卖================================"
-            print '\033[0m'
+            self.print_red("================================每日买卖================================")
             self.__get_daily_order(s_code.lower())
 
-        print '\033[1;31;40m'
-        print "================================大资金马甲================================"
-        print '\033[0m'
+        self.print_red("================================大资金马甲================================")
         for xx in range(0, len(xiaohao)):
             is_B = self.__find_majia(xiaohao[xx]['name'], xiaohao[xx]['opt'])
             if is_B:
                 print is_B
 
-        print '\033[1;31;40m'
-        print "================================历史交叉================================"
-        print '\033[0m'
+        self.print_red("================================历史交叉================================")
         self.__get_gudong_history(xiaohao, stock_list)
 
-        print '\033[1;31;40m'
-        print "================================Over %s=%s===============================" % (s_code, stock_list[s_code]['name'])
-        print '\033[0m'
+        self.print_red("================================Over %s=%s======================" % (s_code, stock_list[s_code]['name']))
 
     def __get_daily_order(self, s_code):
         opt_list = self.mysql.getRecord("SELECT * FROM  `s_stock_fenbi_daily` WHERE s_code='%s' order by dateline desc" % s_code)
         #print "SELECT * FROM  `s_stock_fenbi_daily` WHERE s_code='%s' order by dateline desc" % s_code
         if len(opt_list):
-            attributes = ["Time", "Buy", "Sell", "All"]
+            attributes = ["Time", "Buy", "Sell", "BS", "All", "Skip", "BO", "SO", "Chg", "HS"]
             table = pylsytable(attributes)
             _time = []
             _buy = []
             _sell = []
+            _bs = []
             _all = []
+            _skip = []
+            _level_A = []
+            _level_B = []
+            _chg = []
+            _hs = []
+            day2 = []
             for x in range(0, len(opt_list)):
                 _time.append(opt_list[x]['dateline'])
-                _buy.append("%s/%s" % (opt_list[x]['b_price'], opt_list[x]['b_hands']))
-                _sell.append("%s/%s" % (opt_list[x]['s_price'], opt_list[x]['s_hands']))
-                _c = "{:.2f}".format((opt_list[x]['bs_count']/10000), '')
+                day2.append(str(opt_list[x]['dateline']))
+                #_buy.append("%s/%s" % (opt_list[x]['b_price'], opt_list[x]['b_hands']))
+                #_sell.append("%s/%s" % (opt_list[x]['s_price'], opt_list[x]['s_hands']))
+
+                _buy.append(int(opt_list[x]['zl_b']/10000))
+                _sell.append(int(-opt_list[x]['zl_s']/10000))
+                _bs.append(int(opt_list[x]['zl_b']/10000) + int(-opt_list[x]['zl_s']/10000))
+                _c = int(opt_list[x]['bs_all']/10000)
                 _all.append(_c)
+                _skip.append(opt_list[x]['skip_order'])
+                _level_A.append("%s/%s/%s/%s" % (opt_list[x]['b_3'], opt_list[x]['b_5'], opt_list[x]['b_7'], opt_list[x]['b_10']))
+                _level_B.append("%s/%s/%s/%s" % (opt_list[x]['s_3'], opt_list[x]['s_5'], opt_list[x]['s_7'], opt_list[x]['s_10']))
+
+            stock_days = self.mysql.getRecord("SELECT * FROM s_stock_trade WHERE  s_code='%s' and dateline in(%s) " % (s_code, ','.join(day2)))
+            stock_daily = {}
+            for j in range(0, len(stock_days)):
+                #d = datetime.datetime.strptime(str(stock_days[j]['dateline']), "%Y%m%d")
+                #_dd = self.tools.d_date('%Y-%m-%d', time.mktime(d.timetuple()))
+                stock_daily[str(stock_days[j]['dateline'])] = stock_days[j]
+            for x in range(0, len(opt_list)):
+                _chg.append(stock_daily[str(opt_list[x]['dateline'])]['chg'])
+                _huanshou = "{:.2f}".format(stock_daily[str(opt_list[x]['dateline'])]['turnover'], '')
+                _hs.append(_huanshou)
+
             table.add_data("Time", _time)
             table.add_data("Buy", _buy)
             table.add_data("Sell", _sell)
+            table.add_data("BS", _bs)
             table.add_data("All", _all)
+            table.add_data("Skip", _skip)
+            table.add_data("BO", _level_A)
+            table.add_data("SO", _level_B)
+            table.add_data("Chg", _chg)
+            table.add_data("HS", _hs)
+
+            #5日流出
+            '''
+            i = 5
+            _daily_B = []
+            _daily_S = []
+            while i:
+                attributes2.append("D%s" % i)
+                print _buy[i]
+                _daily_B.append(_buy[i])
+                _daily_S.append(_sell[i])
+
+                i -= 1
+            table2 = pylsytable(attributes2)
+            '''
+
             print(table.__str__())
 
     def __get_gudong_history(self, xiaohao, all_stock_list):
@@ -639,7 +654,7 @@ class F10(StatsEngine):
         for k, v in self.PARTNER.items():
             for av in range(0, len(v)):
                 if name in v[av]['people']:
-                    is_B = u'【%s】【%s/%s/%s】==%s==%s===' % (v[av]['level'], (av+1), k, v[av]['key'], name, opt)
+                    is_B = '【%s】【%s/%s/%s】==%s==%s===' % (v[av]['level'], (av+1), k, v[av]['key'], name, opt)
                     break
 
         return is_B
@@ -682,6 +697,7 @@ class F10(StatsEngine):
             _sell = []
             _has_days = []
             _has_day_list = {}
+            _diff = []
             for x in range(0, len(data)):
                 #最多有效期内的数据
                 if len(_time) > MAX_FIVE_ORDER_DAYS:
@@ -694,6 +710,11 @@ class F10(StatsEngine):
                     _has_day_list[_day] = 0
 
                 #一天最多显示次数
+                key = "%s=%s=%s" % (str(data[x]['date_str'])[0: 10], str(data[x]['b_amount'])[0: 2], str(data[x]['s_amount'])[0: 2])
+                if key not in _diff:
+                    _diff.append(key)
+                else:
+                    continue
                 if _has_day_list[_day] == MAX_FIVE_ORDER_NUM:
                     continue
                 _has_day_list[_day] += 1
@@ -864,7 +885,7 @@ class F10(StatsEngine):
                 for j in range(0, len(v[av]['yyb'])):
                     __yyb_id = v[av]['yyb'][j]['yyb_id']
                     yyb_ids.append(int(__yyb_id))
-                    is_B = u'【%s】【%s】【%s/%s/%s】=%s=' % (type_info[k], v[av]['level'], (av+1), k, v[av]['key'], v[av]['yyb'][j]['name'])
+                    is_B = '【%s】【%s】【%s/%s/%s】=%s=' % (type_info[k], v[av]['level'], (av+1), k, v[av]['key'], v[av]['yyb'][j]['name'])
                     yyb_info[int(__yyb_id)] = is_B
 
         #TODO 时间限定为最近1年
@@ -876,7 +897,7 @@ class F10(StatsEngine):
                 if len(b) > 5:
                     break
                 if _tmp_data['yyb_id'] in yyb_ids:
-                    print "===%s==%s==%s==%s==%s=" % (_tmp_data['type'], self.__special_day(_tmp_data['dateline']), int(_tmp_data['B_volume']/10000), int(_tmp_data['S_volume']/10000), yyb_info[_tmp_data['yyb_id']],)
+                    print "===%s==%s==%s==%s==%s=" % (_tmp_data['type'], self.__special_day(_tmp_data['dateline']), int(_tmp_data['B_volume']/10000), int(_tmp_data['S_volume']/10000), yyb_info[_tmp_data['yyb_id']])
                     if _tmp_data['dateline'] not in b:
                         b.append(_tmp_data['dateline'])
 
@@ -896,14 +917,15 @@ class F10(StatsEngine):
     def __is_add(self, ishis, chg):
         res = ''
         if ishis == 0:
-            res = u'【新进】'
+            res = '【新进】'
         else:
             if chg < 0:
-                res = u'【减仓】'
+                res = '【减仓】'
             elif chg > 0:
-                res = u'【加仓】'
+                res = '【加仓】'
             else:
-                res = u'【持有】'
+                res = '【持有】'
+
         return res
 
     def search_gudong_name(self):
@@ -963,8 +985,8 @@ class F10(StatsEngine):
         print c
 
     def __clear_gudong_name(self, name):
-        name = name.replace(u'股份', '')
-        name = name.replace(u'有限公司', '')
+        name = name.replace('股份', '')
+        name = name.replace('有限公司', '')
         is_B = self.__find_majia(name, 0)
         if is_B:
             name = "\033[0;32;40m %s \033[0m" % is_B
@@ -993,10 +1015,13 @@ class F10(StatsEngine):
     def gudong_change(self):
         #股东减少排序
         vtype = sys.argv[2]
+        show_five_order = 0
+        if len(sys.argv) == 4:
+            show_five_order = 1
 
-        if vtype == '1':
+        if vtype == 'A':
             #最后报告时间
-            end_date = 20160815
+            end_date = 20161015
             opt_list = self.mysql.getRecord("SELECT * FROM  `s_stock_shareholdernum`  WHERE bigid IN (SELECT bigid FROM s_stock_shareholdernum WHERE  `enddate` >=%s AND totalshamt >300 and askshrto<0 ORDER BY enddate DESC ) ORDER BY askshrto ASC limit 1500" % end_date)
 
         elif vtype == 2:
@@ -1037,15 +1062,14 @@ class F10(StatsEngine):
             ms = re.findall(re.compile(r'\*|N|ST|航空|银行|钢铁|煤|药|酒|电力'), _stock_info['name'])
             if _stock_info['run_market'] > 15000000000 or _stock_info['run_market'] < 1500000000 or ms:
                 continue
-
-            #print opt_list[k]['s_code']
-            #continue
             '''
+            if show_five_order == 1:
+                print opt_list[k]['s_code']
 
             codes.append(opt_list[k]['s_code'])
             _no.append(i)
             _code.append(opt_list[k]['s_code'])
-            _name.append(_stock_info['name'])
+            _name.append(stock_list[opt_list[k]['s_code']]['name'])
             _chage.append(opt_list[k]['askshrto'])
             _all.append(opt_list[k]['totalshamt'])
             _gu.append(opt_list[k]['askavgsh'])
@@ -1059,7 +1083,8 @@ class F10(StatsEngine):
         table.add_data("All", _all)
         table.add_data("Gu", _gu)
         table.add_data("Last", _date)
-        print(table.__str__())
+        if show_five_order == 0:
+            print(table.__str__())
 
     def find_zh_majia(self):
         #查找历史股东中出现在特定股票组合的次数

@@ -59,24 +59,26 @@ echo "Stock Day_Report done.\n"
 #python /htdocs/quant/soga/realtime.py get_new_gudong 1
 #python /htdocs/quant/soga/realtime.py get_jj_hold 1
 #股东变化
-#python /htdocs/quant/soga/realtime.py get_gudong_change 1
+#python /htdocs/quant/soga/realtime.py get_gudong_change A
 
 
 #python /htdocs/quant/soga/realtime.py save_big_order 20160930
 #python /htdocs/quant/soga/realtime.py stats_big_order 20160930 A|B|C
 
-
+#分笔买卖
 #python /htdocs/quant/soga/realtime.py save_multi_bs_order 20161202
 #python /htdocs/quant/soga/realtime.py count_bs_order 20161202
 #python /htdocs/quant/soga/realtime.py stats_bs_order 20161202
 
+#python /htdocs/quant/soga/realtime.py pankou_stock_skip 20161220 002552
+
+#龙虎历史
+#python /htdocs/quant/soga/realtime.py history_lhb 600836
+#python /htdocs/quant/soga/realtime.py history_lhb 002735  >> ~/Downloads/002735.xls
+
 #股东组合
 #python /htdocs/quant/soga/realtime.py get_gudong_zuhe
 
-
-#分笔买卖
-#python /htdocs/quant/soga/realtime.py save_bs_order 1
-#python /htdocs/quant/soga/realtime.py count_bs_order 1
 
 #python /htdocs/quant/soga/site.py baidu_words_a
 #python /htdocs/quant/soga/site.py baidu_words_b

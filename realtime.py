@@ -2,6 +2,7 @@
 import sys
 import time
 from quant.spider.MinData import *
+from quant.spider.LhbData import *
 #from quant.spider.Handicap import *
 #from quant.core.DB import sMysql
 
@@ -9,6 +10,7 @@ from quant.stats.RealTimeChange import *
 from quant.stats.SecondDraw import *
 from quant.stats.Pankou import *
 from quant.stats.Department import *
+from quant.stats.Common import *
 
 from quant.stats.F10 import *
 
@@ -70,15 +72,6 @@ def pankou_save():
     mcache = memcache.Client(['127.0.0.1:11211'])
     while 1:
         Pankou().save(mcache)
-
-
-def save_big_order():
-    Pankou().save_stock_big_order()
-
-
-def stats_big_order():
-    #10jqk
-    Pankou().big_order_list()
 
 
 def stats_bs_order():
@@ -155,8 +148,25 @@ def pankou_daily_five_order():
     Pankou().five_daily_list(sys.argv[2])
 
 
+def pankou_stock_skip():
+    #跳价盘口
+    Pankou().stock_bs_skip_order()
+
+
 def history_lhb():
-    LhbDataSpider().show_daily_lhb()
+    CommonStats().show_daily_lhb()
+
+
+def city_yyb():
+    LhbDataSpider().get_city_yyb()
+
+
+def yyb_last_dateline():
+    LhbDataSpider().get_last_dateline(sys.argv[2])
+
+
+def demo2():
+    CommonStats().demo()
 
 if __name__ == '__main__':
     import argparse
