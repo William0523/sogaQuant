@@ -3,7 +3,6 @@ import sys
 import hashlib
 import re
 import commands
-import base64
 import memcache
 #from quant.core.Stats import *
 from datetime import date, datetime
@@ -483,6 +482,8 @@ class Pankou(SpiderEngine):
             _has = self.mysql.fetch_one("select * from  s_stock_fenbi_daily where %s" % _where)
             if _has is None:
                 self.mysql.dbInsert('s_stock_fenbi_daily', indata)
+            else:
+                self.mysql.dbUpdate('s_stock_fenbi_daily', indata, _where)
 
     def _filter_bs_D(self):
         dateline = sys.argv[2]
@@ -490,7 +491,7 @@ class Pankou(SpiderEngine):
         unix_time = d_unix - 86000
         yestoday = datetime.fromtimestamp(unix_time).strftime('%Y%m%d')
 
-        sql = "select * from s_stock_fenbi_daily where zl_b-zl_s > 10000000 and  dateline in (%s, %s)" % (yestoday, dateline)
+        sql = "select * from s_stock_fenbi_daily where kp_xc > 15000000 and  dateline in (%s, %s)" % (yestoday, dateline)
         data = self.mysql.getRecord(sql)
         tmp_list = {}
         for i in range(0, len(data)):
@@ -526,15 +527,19 @@ class Pankou(SpiderEngine):
 
     def stock_bs_big_order(self):
         dateline = sys.argv[2]
+        show_five_order = 0
+        if len(sys.argv) == 5:
+            show_five_order = 1
         if sys.argv[3] == 'A':
             #无大单尽买入
-            sql = "SELECT *  FROM  `s_stock_fenbi_daily` AS a WHERE a.dateline =%s and bs_all>9000000 and b_3=0 and b_5=0 and b_7=0 and b_10=0 and bs_all >0 ORDER BY a.bs_all desc " % dateline
+            sql = "SELECT *  FROM  `s_stock_fenbi_daily` AS a WHERE a.dateline =%s and kp_xc>9000000 and b_3=0 and b_5=0 and b_7=0 and b_10=0 and bs_all >0 ORDER BY a.bs_all desc " % dateline
         elif sys.argv[3] == 'B':
-            #尽买入
+            #大单尽买入
             sql = "SELECT *  FROM `s_stock_fenbi_daily` WHERE `dateline` = %s AND (`b_10` > 0 or b_5 > 0 or b_7 >0) order by bs_all desc" % dateline
         elif sys.argv[3] == 'C':
-            #大单买入3KW
-            sql = "SELECT *  FROM `s_stock_fenbi_daily` WHERE `dateline` = %s AND zl_b > 30000000 and zl_b > zl_s order by bs_all desc" % dateline
+            #大单买入3KW 50DDJE > 15000000
+            sql = "SELECT *  FROM `s_stock_fenbi_daily` WHERE `dateline` = %s AND 10DDJE < -10000000 and 50DDJE>0 order by 50DDJE desc" % dateline
+            sql = "SELECT * FROM `s_stock_fenbi_daily` WHERE `dateline` = %s AND 10DDJE < 0 AND 30DDJE>1000000 AND 50DDJE >1000000  order by 50DDJE desc" % dateline
         elif sys.argv[3] == 'D':
             #连续大单流入2KW
             c = self._filter_bs_D()
@@ -547,9 +552,36 @@ class Pankou(SpiderEngine):
                 self.print_green("No Data...")
                 return
         elif sys.argv[3] == 'E':
-            #self._filter_bs_E(20161220, 'sz300153')
-            #self.stock_bs_skip_order()
-            sql = "SELECT * FROM `s_stock_fenbi_daily` WHERE `dateline` = %s and skip_order >5 order by skip_order desc " % dateline
+            #跳单,成交大于1亿
+            stock = self.mysql.getRecord("select * from s_stock_list where dateline=%s and amount > 200000000 order by amount desc " % dateline)
+            _sql = []
+            for o in range(0, len(stock)):
+                _sql.append("'%s'" % stock[o]['s_code'])
+            sql = "SELECT * FROM `s_stock_fenbi_daily` WHERE `dateline` = %s and skip_order >5 AND s_code in(%s) order by skip_order desc " % (dateline, ",".join(_sql))
+
+        elif sys.argv[3] == 'F':
+            #异动次数150
+            sql = "SELECT * FROM `s_stock_fenbi_daily` WHERE `dateline` = %s and YiDongCount >150 order by YiDongCount desc " % dateline
+
+        elif sys.argv[3] == 'G':
+            #成交大于3亿
+            stock = self.mysql.getRecord("select * from s_stock_list where dateline=%s and amount > 300000000 order by amount desc " % dateline)
+            _sql = []
+            for o in range(0, len(stock)):
+                _sql.append("'%s'" % stock[o]['s_code'])
+                if show_five_order:
+                    _pre_x = stock[o]['s_code'][0:2]
+                    if _pre_x == 'sz':
+                        _px = "0%s" % stock[o]['s_code'][2:]
+                    else:
+                        _px = "1%s" % stock[o]['s_code'][2:]
+                    print _px
+
+            if show_five_order:
+                sys.exit()
+            sql = "SELECT *  FROM `s_stock_fenbi_daily` WHERE `dateline` = %s AND s_code in(%s)" % (dateline, ",".join(_sql))
+        elif sys.argv[3] == 'H':
+            sql = "SELECT * FROM `s_stock_fenbi_daily` WHERE `dateline` = %s and 50DDJE >10000000 and 30DDJE > 0 order by 50DDJE desc " % dateline
 
         self.ak = 0
 
@@ -557,23 +589,26 @@ class Pankou(SpiderEngine):
         stock = self.mysql.getRecord("select * from s_stock_list where 1")
         self.stock_list = {}
 
-        show_five_order = 0
-        if len(sys.argv) == 5:
-            show_five_order = 1
-
         for o in range(0, len(stock)):
             tmp_code = stock[o]['s_code']
             self.stock_list[tmp_code] = stock[o]
-
+        #print len(data)
+        #sys.exit()
         if len(data) > 0:
-            attributes = ["Name", "Chg", "Buy", "Sell", "All", "Skip", "B3", "B5", "B7", "B10"]
+            attributes = ["Name", "Chg", "B100", "B50", "B30", "B20", "B10", "Buy", "Sell", "XC", "All", "Skip", "B3", "B5", "B7", "B10"]
             table = pylsytable(attributes)
             _name = []
             _chg = []
+            _b100 = []
+            _b50 = []
+            _b30 = []
+            _b20 = []
+            _b10 = []
             _buy = []
             _sell = []
             _all = []
             _skip = []
+            _xc = []
             _b_3 = []
             _b_5 = []
             _b_7 = []
@@ -590,24 +625,45 @@ class Pankou(SpiderEngine):
                 #if res > 0 and res < 12000000:
                 #    continue
                 _skip.append(data[o]['skip_order'])
-                _name.append("%s=%s" % (data[o]['s_code'], self.stock_list[data[o]['s_code']]['name']))
+                _xc.append(int(data[o]['kp_xc']/10000))
+                _a_name = self.stock_list[data[o]['s_code']]['name']
+                _name.append("%s=%s" % (data[o]['s_code'], _a_name.encode('utf-8')))
                 _chg.append(self.stock_list[data[o]['s_code']]['chg'])
                 #_buy.append("%s=%s" % (data[o]['b_price'], data[o]['b_hands']))
                 #_sell.append("%s=%s" % (data[o]['s_price'], data[o]['s_hands']))
-                _buy.append(data[o]['zl_b'])
-                _sell.append(data[o]['zl_s'])
+                _b100.append(int(data[o]['100DDJE']/10000))
+                _b50.append(int(data[o]['50DDJE']/10000))
+                _b30.append(int(data[o]['30DDJE']/10000))
+                _b20.append(int(data[o]['20DDJE']/10000))
+                _b10.append(int(data[o]['10DDJE']/10000))
+
+                _buy.append(int(data[o]['zl_b']/10000))
+                _sell.append(int(data[o]['zl_s']/10000))
                 _all.append("{:.2f}".format(data[o]['bs_all']/10000, ''))
                 _b_3.append("%s=%s" % (data[o]['b_3'], data[o]['s_3']))
                 _b_5.append("%s=%s" % (data[o]['b_5'], data[o]['s_5']))
                 _b_7.append("%s=%s" % (data[o]['b_7'], data[o]['s_7']))
                 _b_10.append("%s=%s" % (data[o]['b_10'], data[o]['s_10']))
                 if show_five_order:
-                    print data[o]['s_code']
+                    _pre_x = data[o]['s_code'][0:2]
+                    if _pre_x == 'sz':
+                        _px = "0%s" % data[o]['s_code'][2:]
+                    else:
+                        _px = "1%s" % data[o]['s_code'][2:]
+                    print _px
 
             table.add_data("Name", _name)
             table.add_data("Chg", _chg)
+
+            table.add_data("B100", _b100)
+            table.add_data("B50", _b50)
+            table.add_data("B30", _b30)
+            table.add_data("B20", _b20)
+            table.add_data("B10", _b10)
+
             table.add_data("Buy", _buy)
             table.add_data("Sell", _sell)
+            table.add_data("XC", _xc)
             table.add_data("All", _all)
             table.add_data("Skip", _skip)
             table.add_data("B3", _b_3)
@@ -615,8 +671,8 @@ class Pankou(SpiderEngine):
             table.add_data("B7", _b_7)
             table.add_data("B10", _b_10)
             if show_five_order == 0:
-                print(table.__str__())
-        print u"==========共有%s=====" % self.ak
+                print table.__str__()
+        print "==========Count %s=====" % self.ak
 
     def _avg_buy(self, s_code):
         #最近5天主力平均买入

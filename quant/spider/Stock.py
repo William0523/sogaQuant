@@ -35,16 +35,16 @@ class StockSpider(SpiderEngine):
         dateline = sys.argv[2]
         i = 0
         while True:
-            stock = self.mysql.getRecord("select * from s_stock_list where dateline=%s and id >%s limit 100" % (dateline, i))
-            print "select * from s_stock_list where dateline=%s and id >%s limit 100" % (dateline, i)
-            #stock = self.mysql.getRecord("select * from s_stock_trade where dateline=%s limit %s ,100" % (dateline, i))
+            #stock = self.mysql.getRecord("select * from s_stock_list where dateline=%s and id >%s limit 100" % (dateline, i))
+            #print "select * from s_stock_list where dateline=%s and id >%s limit 100" % (dateline, i)
+            stock = self.mysql.getRecord("select * from s_stock_trade where dateline=%s limit %s ,100" % (dateline, i))
             if len(stock) == 0:
                 break
             datas = []
             for o in range(0, len(stock)):
                 datas.append(stock[o]['s_code'])
-                i = stock[o]['id']
-                #i += 1
+                #i = stock[o]['id']
+                i += 1
             self.run_worker(datas)
 
     def get_info(self, s_code):
@@ -159,7 +159,7 @@ class StockSpider(SpiderEngine):
         _dd = 20160930
         step = 20161115
         while 1:
-            if i > 2960:
+            if i > 3150:
                 break
             _has = self.mysql.fetch_one("select * from s_stock_list where id=%s" % i)
             i += 1
@@ -318,3 +318,11 @@ class StockSpider(SpiderEngine):
                 indata['last_update'] = self.tools.d_date('%Y%m%d')
                 self.mysql.dbInsert('s_stock_shareholdernum', indata)
             print indata
+
+        def kpl_api(self, s_code):
+            #url = s_code[2:]
+            url = 'sz000882'
+            out_put = '/usr/bin/php /htdocs/quant/baidu.php %s' % base64.b64encode(url)
+            print out_put
+            _data = commands.getoutput(out_put)
+            print _data

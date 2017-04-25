@@ -23,10 +23,11 @@ class LhbDataSpider(SpiderEngine):
 
         #self.get_city_yyb()
         #sys.exit()
-
+        #self.get_new_yyb_name()
+        #sys.exit()
         logging.debug('Start Daily Lhb=====Days:%s ' % sys.argv[2])
         self.daily_lhb(sys.argv[2])
-
+        #sys.exit()
         logging.debug('Start Daily Lhb=====Detail:%s ' % sys.argv[2])
         day_list = self.mysql.getRecord("SELECT * FROM s_lhb_days WHERE status=0 and dateline=%s" % sys.argv[2])
         for i in range(0, len(day_list)):
@@ -63,6 +64,24 @@ class LhbDataSpider(SpiderEngine):
             if xd[0] not in has:
                 self.get_yyb_data(xd[0])
         '''
+    def get_new_yyb_name(self):
+        '''
+        更新营业部名称
+        '''
+        has_yyb = self.mysql.getRecord("select * from s_lhb where name='没有名字'")
+        if len(has_yyb) > 0:
+            for i in range(0, len(has_yyb)):
+                url = 'http://data.eastmoney.com/stock/lhb/yyb/%s.html' % has_yyb[i]['codex']
+                _data = self.sGet(url)
+                _tr = self.sMatch('<title>', "<\/title>", _data, 0)
+                name = _tr[0].replace(u'数据中心', '')
+                name = name.replace(u'东方财富网', '')
+                name = name.replace(u'_', '')
+                name = name.replace(u'证券营业部龙虎榜数据', '')
+                name = name.replace(u'龙虎榜数据', '')
+                self.mysql.dbUpdate('s_lhb', {'name': name}, "codex=%s" % has_yyb[i]['codex'])
+                print name
+
     def __get_yyb_last_dateline(self, ds):
         #ds = 80135988
         url = "http://data.eastmoney.com/DataCenter_V3/stock2016/jymx.ashx?pagesize=50&page=1&js=var+fguIHta&param=&sortRule=-1&sortType=&gpfw=0&code=%s&rt=24462227" % ds
@@ -148,6 +167,7 @@ class LhbDataSpider(SpiderEngine):
 
     def get_daily_detail(self, s_data, dateline):
         s_code = s_data['s_code']
+       #s_code = 'SH603615'
         d = datetime.datetime.strptime(dateline, "%Y%m%d")
         days = self.tools.d_date('%Y-%m-%d', time.mktime(d.timetuple()))
         url = "http://data.eastmoney.com/stock/lhb,%s,%s.html" % (days, s_code[2:10])
@@ -159,7 +179,10 @@ class LhbDataSpider(SpiderEngine):
         _tr = self.sMatch(u'成交量：', u"成交金额：", _data, 1)
         _td = self.sMatch(u'涨跌幅：', u'成交量：', _data, 1)
         #print _tr
+        #print len(_tr)
         #sys.exit()
+        if len(_tr) == 0:
+            return 1
         if _tr is None:
             self.tools.sWrite(_data, log_file)
             self.mysql.dbUpdate('s_lhb_days', {'status': 1}, "id=%s" % s_data['id'])
@@ -236,6 +259,49 @@ class LhbDataSpider(SpiderEngine):
         return _in_data
 
     def daily_lhb(self, dateline):
+        #每日上榜
+        d = datetime.datetime.strptime(dateline, "%Y%m%d")
+        days = self.tools.d_date('%Y-%m-%d', time.mktime(d.timetuple()))
+        url = "http://data.eastmoney.com/stock/tradedetail/%s.html" % days
+        print url
+        _data = self.sGet(url)
+        #print _data
+        logging.debug('GetUrl:%s  Length:%s' % (url, len(_data)))
+        #print len(_data)
+        _tr = self.sMatch('data_tab_1=', ';', _data, 0)
+        if(len(_tr) == 0):
+            print "None Data......."
+            sys.exit()
+
+        #print _tr
+        re = json.loads(_tr[0])
+        for i in range(0, len(re['data'])):
+            s_code = re['data'][i]['SCode']
+            #print s_code
+            _prx = s_code[0:1]
+
+            if int(_prx) not in [0, 3, 6]:
+                print "what"
+                continue
+            if int(_prx) == 0 or int(_prx) == 3:
+                s_code = 'sz%s' % s_code
+            else:
+                s_code = 'sh%s' % s_code
+            indata = {
+                'dateline': dateline,
+                's_code': s_code,
+                'v_hands': 0,
+                'ud': 0,
+                'volume': re['data'][i]['ZeMoney'],
+                's_reason': ''
+            }
+            print indata
+            _has = self.mysql.fetch_one("select * from  s_lhb_days where s_code='%s' and dateline=%s" % (indata['s_code'], dateline))
+            if _has is None:
+                self.mysql.dbInsert('s_lhb_days', indata)
+        #print re
+
+    def daily_lhb2(self, dateline):
         #每日上榜
         d = datetime.datetime.strptime(dateline, "%Y%m%d")
         days = self.tools.d_date('%Y-%m-%d', time.mktime(d.timetuple()))

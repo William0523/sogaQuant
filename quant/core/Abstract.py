@@ -51,20 +51,25 @@ class Abstract(object):
     def read_gudong_config(self):
         self.config_path = os.path.dirname(__file__) + '/../../gudong.json'
         return self.file2dict(self.config_path)
+        #a = self.mysql.fetch_one("select * from s_yyb where id=1")
+        #print a['content']
+        #return json.loads(a['content'])
 
     def __read_config(self):
         """读取 config"""
         self.config_path = os.path.dirname(__file__) + '/../../config.json'
+        self.config_path = os.path.abspath(self.config_path)
         self.config = self.file2dict(self.config_path)
-        #self.global_config = self.file2dict(self.global_config_path)
-        #self.config.update(self.global_config)
 
     def file2dict(self, path):
         with open(path) as f:
             return json.load(f)
 
     def run_php(self, path):
-        cmd = 'php /htdocs/quant/soga/mv/index.php %s' % path
+        phpindex = os.path.dirname(__file__) + '/../../php/index.php'
+        phpindex = os.path.abspath(phpindex)
+        cmd = 'php %s Base %s' % (phpindex, path)
+        print cmd
         os.system(cmd)
 
     def get_md5(self, s):

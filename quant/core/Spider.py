@@ -71,8 +71,8 @@ class SpiderEngine(Abstract):
         #curl.setopt(pycurl.HTTPGET,1)
         #curl.setopt(pycurl.COOKIE, Cookie)
         #curl.setopt(pycurl.POSTFIELDS, 'j_username={ngnms_user}&j_password={ngnms_password}'.format(**self.ngnms_login))
-        curl.setopt(pycurl.COOKIEJAR, '/tmp/py_cookie.txt')
-        curl.setopt(pycurl.COOKIEFILE, '/tmp/py_cookie.txt')
+        curl.setopt(pycurl.COOKIEJAR, '/htdocs/logs/py_cookie.txt')
+        curl.setopt(pycurl.COOKIEFILE, '/htdocs/logs/py_cookie.txt')
         if refUrl:
             curl.setopt(pycurl.REFERER, refUrl)
         #curl.setopt(c.CONNECTTIMEOUT, 5)

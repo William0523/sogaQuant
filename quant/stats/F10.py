@@ -368,7 +368,7 @@ class F10(StatsEngine):
         for a in range(0, len(result)):
             print '\033[1;31;40m'
             this_money = int(result[a]['sh_shares'] * stock_list[result[a]['s_code']]['close'])
-            print "%s==%s==%s==%s==%s==%sW==%s" % (result[a]['sh_rank'], result[a]['sh_code'], self.__clear_gudong_name(result[a]['sh_name']), result[a]['ishis'], round(result[a]['sh_shares'], 2), this_money, int(result[a]['chg']))
+            print "%s==%s==%s==%s==%s==%sW==%s" % (result[a]['sh_rank'], result[a]['sh_code'], self.__clear_gudong_name(result[a]['sh_name']).encode('utf-8'), result[a]['ishis'], round(result[a]['sh_shares'], 2), this_money, int(result[a]['chg']))
             #print "%s==%s==%s==%s==%s==%sW==%s" % (result[a]['sh_rank'], result[a]['sh_code'], self.__clear_gudong_name(result[a]['sh_name']), 1, round(result[a]['sh_shares'], 2), this_money, int(result[a]['chg']))
 
             print '\033[0m'
@@ -421,7 +421,7 @@ class F10(StatsEngine):
 
                 print '\033[1;31;40m'
                 this_money = int(out_buy[a]['sh_shares'] * stock_list[out_buy[a]['s_code']]['close'])
-                print "%s==%s==%s==%s==%s==%sW==%s" % (out_buy[a]['sh_rank'], out_buy[a]['sh_code'], self.__clear_gudong_name(out_buy[a]['sh_name']), out_buy[a]['ishis'], round(out_buy[a]['sh_shares'], 2), this_money, int(out_buy[a]['chg']))
+                print "%s==%s==%s==%s==%s==%sW==%s" % (out_buy[a]['sh_rank'], out_buy[a]['sh_code'], self.__clear_gudong_name(out_buy[a]['sh_name']).encode('utf-8'), out_buy[a]['ishis'], round(out_buy[a]['sh_shares'], 2), this_money, int(out_buy[a]['chg']))
                 print '\033[0m'
                 ms = re.findall(re.compile(r'全国社保基金'), out_buy[a]['sh_name'])
                 if out_buy[a]['sh_code'] in black_list or ms:
@@ -479,7 +479,7 @@ class F10(StatsEngine):
         opt_list = self.mysql.getRecord("SELECT * FROM  `s_stock_fenbi_daily` WHERE s_code='%s' order by dateline desc" % s_code)
         #print "SELECT * FROM  `s_stock_fenbi_daily` WHERE s_code='%s' order by dateline desc" % s_code
         if len(opt_list):
-            attributes = ["Time", "Buy", "Sell", "BS", "All", "Skip", "BO", "SO", "Chg", "HS"]
+            attributes = ["Time", "Buy", "Sell", "XC", "BS", "All", "Skip", "YiDong", "DuiDao", "BO", "SO", "Chg", "HS"]
             table = pylsytable(attributes)
             _time = []
             _buy = []
@@ -487,6 +487,9 @@ class F10(StatsEngine):
             _bs = []
             _all = []
             _skip = []
+            _xc = []
+            _yd = []
+            _dd = []
             _level_A = []
             _level_B = []
             _chg = []
@@ -503,6 +506,9 @@ class F10(StatsEngine):
                 _bs.append(int(opt_list[x]['zl_b']/10000) + int(-opt_list[x]['zl_s']/10000))
                 _c = int(opt_list[x]['bs_all']/10000)
                 _all.append(_c)
+                _yd.append(opt_list[x]['YiDongCount'])
+                _dd.append(opt_list[x]['DuiDaoCount'])
+                _xc.append(int(opt_list[x]['kp_xc']/10000))
                 _skip.append(opt_list[x]['skip_order'])
                 _level_A.append("%s/%s/%s/%s" % (opt_list[x]['b_3'], opt_list[x]['b_5'], opt_list[x]['b_7'], opt_list[x]['b_10']))
                 _level_B.append("%s/%s/%s/%s" % (opt_list[x]['s_3'], opt_list[x]['s_5'], opt_list[x]['s_7'], opt_list[x]['s_10']))
@@ -524,6 +530,9 @@ class F10(StatsEngine):
             table.add_data("BS", _bs)
             table.add_data("All", _all)
             table.add_data("Skip", _skip)
+            table.add_data("XC", _xc)
+            table.add_data("YiDong", _yd)
+            table.add_data("DuiDao", _dd)
             table.add_data("BO", _level_A)
             table.add_data("SO", _level_B)
             table.add_data("Chg", _chg)
@@ -657,7 +666,7 @@ class F10(StatsEngine):
                     is_B = '【%s】【%s/%s/%s】==%s==%s===' % (v[av]['level'], (av+1), k, v[av]['key'], name, opt)
                     break
 
-        return is_B
+        return is_B.encode('utf-8')
 
     def __get_gudong_nums(self, s_code):
         #股东人数变化
@@ -885,7 +894,10 @@ class F10(StatsEngine):
                 for j in range(0, len(v[av]['yyb'])):
                     __yyb_id = v[av]['yyb'][j]['yyb_id']
                     yyb_ids.append(int(__yyb_id))
-                    is_B = '【%s】【%s】【%s/%s/%s】=%s=' % (type_info[k], v[av]['level'], (av+1), k, v[av]['key'], v[av]['yyb'][j]['name'])
+                    _zh_level = v[av]['level'].encode('utf-8')
+                    _zh_key = v[av]['key'].encode('utf-8')
+                    _zh_name = v[av]['yyb'][j]['name'].encode('utf-8')
+                    is_B = "【%s】【%s】【%s/%s/%s】=%s=" % (type_info[k], _zh_level, (av+1), k.encode('utf-8'), _zh_key, _zh_name)
                     yyb_info[int(__yyb_id)] = is_B
 
         #TODO 时间限定为最近1年

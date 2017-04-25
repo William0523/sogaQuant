@@ -58,7 +58,7 @@ def get_multi_close_data(params):
     id = 0
     while True:
         offset = id*50
-        temp = mysql.getRecord("SELECT s_code FROM s_stock_list WHERE 1 LIMIT %d, %d" % (offset, 50))
+        temp = mysql.getRecord("SELECT s_code FROM s_stock_list WHERE dateline=20170413 LIMIT %d, %d" % (offset, 50))
         if len(temp) == 0:
             break
         else:
@@ -67,7 +67,7 @@ def get_multi_close_data(params):
             for row in temp:
                 resx.append(row['s_code'])
 
-            url = "php /htdocs/soga/trader/index.php Base get_closing_bid_new %s %s" % (",".join(resx), sys.argv[2])
+            url = "php /htdocs/quant/soga/mv/index.php Base get_closing_bid_new %s %s" % (",".join(resx), sys.argv[2])
             data.append(url)
         id += 1
         print id
